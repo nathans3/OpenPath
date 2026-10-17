@@ -171,6 +171,20 @@ function runOcrScript(file, labels, { fast = false } = {}) {
 // circle, answer box and pointer. Text found there is OpenPath's own words.
 const insideAny = (x, y, rects) => (rects || []).some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
 
+// The browser's own strip at the top of its window (tabs, address bar,
+// toolbar). Tab titles repeat page words ("Create a strong password"), so
+// nothing up there is ever the box to point at. Cached for a second.
+let chromeCache = { at: 0, band: null };
+async function browserChrome() {
+  if (Date.now() - chromeCache.at < 1000) return chromeCache.band;
+  const info = await helperAsk({ cmd: "browser" }).catch(() => null);
+  const w = info?.ok && info.isBrowser ? info.window : null;
+  const band = w ? { x: w.x, y: w.y, w: w.w, h: /safari/i.test(info.app) ? 54 : 92 } : null;
+  chromeCache = { at: Date.now(), band };
+  return band;
+}
+const inBand = (cx, cy, b) => b && cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+
 async function locate(labels, near, exclude) {
   if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
   const list = (labels || []).filter(Boolean).slice(0, 40);
@@ -191,6 +205,8 @@ async function locate(labels, near, exclude) {
     if (!ownWindowsInPicture) exclude = [];                      // the helper already left OpenPath out
     matches = matches.filter((m) => !isAddress(m.text));        // never the browser's address bar
     matches = matches.filter((m) => m.exact || m.word);         // whole words only: "Day" is not the "day" in "birthday"
+    const chrome = await browserChrome();
+    if (chrome) matches = matches.filter((m) => !inBand((m.x + m.w / 2) * display.size.width, (m.y + m.h / 2) * display.size.height, chrome));
     const W = display.size.width, H = display.size.height;
     const scored = matches.map((m) => ({ x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, m }))
       .filter((b) => !insideAny(b.x + b.w / 2, b.y + b.h / 2, exclude))
@@ -240,8 +256,10 @@ async function findAll(labels, exclude) {
       matches = res.matches;
     }
     const W = display.size.width, H = display.size.height, best = new Map();
+    const chrome = await browserChrome();
     for (const m of matches) {
       if (isAddress(m.text)) continue;
+      if (inBand((m.x + m.w / 2) * W, (m.y + m.h / 2) * H, chrome)) continue;   // tab titles are not the page
       const box = { x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, text: m.label };
       if (insideAny(box.x + box.w / 2, box.y + box.h / 2, exclude)) continue;
       const score = m.exact ? 2 : m.word ? 1 : 0;
