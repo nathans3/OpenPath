@@ -276,6 +276,22 @@ async function browserParts() {
   return out;
 }
 
+// The web address showing in the browser in front, read from its toolbar
+// (reading only). { ok, isBrowser, url } — url is null when it cannot be read.
+async function browserUrl() {
+  if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
+  const info = await helperAsk({ cmd: "browser" });
+  if (!info?.ok) return { ok: false };
+  if (!info.isBrowser || !info.window) return { ok: true, isBrowser: false, url: null, app: info.app };
+  const win = info.window, safari = /safari/i.test(info.app);
+  const row = safari ? { top: win.y + 4, bottom: win.y + 48 } : { top: win.y + 40, bottom: win.y + 86 };
+  const strip = { x: win.x, y: row.top, w: win.w, h: row.bottom - row.top };
+  const m = await helperRead({ labels: [], fast: false, scale: 2, rect: strip });
+  const urlish = /^(https?:\/\/)?(www\.)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i;
+  const hit = (m || []).map((x) => x.text.replace(/\s/g, "")).find((t) => urlish.test(t));
+  return { ok: true, isBrowser: true, app: info.app, url: hit || null };
+}
+
 // Every line of text inside `region` (screen points). Used to notice that the
 // screen changed after the person clicked (a menu opened, a tab appeared).
 async function readRegion(region, exclude) {
@@ -333,4 +349,4 @@ function cleanup() {
   if (helper) { try { helper.kill(); } catch { /* ignore */ } }
 }
 
-module.exports = { locate, findAll, browserParts, readRegion, snapshotForClaude, isSensitive, cleanup };
+module.exports = { locate, findAll, browserParts, readRegion, snapshotForClaude, isSensitive, cleanup, browserUrl };

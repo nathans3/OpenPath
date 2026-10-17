@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("openpathNative", {
   locate: (labels, near, exclude) => ipcRenderer.invoke("screen:locate", { labels, near, exclude }),
   findAll: (labels, exclude) => ipcRenderer.invoke("screen:findAll", { labels, exclude }),
   browserParts: () => ipcRenderer.invoke("screen:browser"),
+  browserUrl: () => ipcRenderer.invoke("screen:url"),
   watchTarget: (target) => ipcRenderer.invoke("follow:watch", target),
   stopWatch: () => ipcRenderer.invoke("follow:stop"),
   followStatus: () => ipcRenderer.invoke("follow:status"),

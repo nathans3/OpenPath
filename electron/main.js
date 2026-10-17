@@ -161,6 +161,7 @@ ipcMain.handle("ai:available", () => anthropic.available(store.getAll()));
 ipcMain.handle("screen:locate", (_e, { labels, near, exclude }) => vision.locate(labels, near, exclude));
 ipcMain.handle("screen:findAll", (_e, { labels, exclude }) => vision.findAll(labels, exclude));
 ipcMain.handle("screen:browser", () => vision.browserParts());
+ipcMain.handle("screen:url", () => vision.browserUrl());
 ipcMain.handle("follow:watch", (e, target) => follow.watch(e.sender, target));
 ipcMain.handle("follow:stop", () => { follow.stop(); return true; });
 ipcMain.handle("follow:status", () => follow.status());
