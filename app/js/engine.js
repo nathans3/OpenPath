@@ -136,7 +136,7 @@ export async function respond(rawQuery) {
       const pr = await native.point({ query, language: lang, history, frontTitle: front });
       if (pr.ok) {
         active = null;
-        logEvent({ type: "cost", title: "Claude looked at your screen", detail: `${pr.usage?.input_tokens || 0} in / ${pr.usage?.output_tokens || 0} out tokens. The picture was not saved.` });
+        logEvent({ type: "cost", title: pr.escalated ? "Expert AI answered (Sonnet)" : "Quick AI answered (Haiku)", detail: `${pr.usage?.input_tokens || 0} in / ${pr.usage?.output_tokens || 0} out tokens. The picture was not saved.` });
         return { text: pr.text, source: "claude", point: pr.target || null };
       }
       if (pr.reason && !["no_key", "sensitive"].includes(pr.reason)) logEvent({ type: "warn", title: "Couldn't use a screen picture", detail: `${pr.reason}. Answering from window names instead.` });

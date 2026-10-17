@@ -5,7 +5,7 @@ import { LANGUAGES, t, hasFullUi } from "./i18n.js";
 import { speak, warmLocalWhisper, warmKokoro, kokoroState } from "./speech.js";
 import { hasOfflineLanguage } from "./knowledge.js";
 
-const PRICE = { haikuIn: 0.10, haikuOut: 0.50, opusIn: 4, opusOut: 20, elevenPer1k: 0.10, whisperPerMin: 0.006 };   // ElevenLabs Multilingual v2 rate (Flash: 0.05)
+const PRICE = { haikuIn: 0.10, haikuOut: 0.50, sonnetIn: 2, sonnetOut: 10, opusIn: 4, opusOut: 20, whisperPerMin: 0.006 };
 
 export function mountSidebar(root) {
   const side = document.createElement("aside");
@@ -34,13 +34,13 @@ export function mountSidebar(root) {
     voice: (lang) => `
       <div class="op-field"><span class="lbl">Quality</span>
         <div class="op-langs">
-          <button type="button" data-quality="best" aria-pressed="${(s().qualityMode || "best") !== "low"}"><span>Best quality</span><small>Claude Opus 5.5, ElevenLabs Multilingual v2, Whisper small</small></button>
-          <button type="button" data-quality="low" aria-pressed="${s().qualityMode === "low"}"><span>Lowest cost</span><small>Claude Haiku 5.5, free English voice, Whisper base</small></button>
+          <button type="button" data-quality="best" aria-pressed="${(s().qualityMode || "best") !== "low"}"><span>Best quality</span><small>Whisper small, natural English voice; with cloud: Claude Haiku 5.5, Sonnet 5.5 for hard questions</small></button>
+          <button type="button" data-quality="low" aria-pressed="${s().qualityMode === "low"}"><span>Lowest cost</span><small>Whisper base; with cloud: Claude Haiku 5.5</small></button>
         </div>
         <p class="op-help">Full answers to any question need an Anthropic API key, added once in the Setup tab. Without one, OpenPath uses its built-in guides.</p></div>
       <div class="op-status-line">
         <span class="op-chip ${state.sttMode === "typed" ? "warn" : "ok"}">🎙 ${sttLabel()}</span>
-        <span class="op-chip ${state.ttsMode === "elevenlabs" || state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${{ elevenlabs: "ElevenLabs", kokoro: "Natural voice (local)", pack: "Recorded voice", system: "System voice" }[state.ttsMode] || "System voice"}</span>
+        <span class="op-chip ${state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${state.ttsMode === "kokoro" ? "Natural voice (on this computer)" : "Computer voice"}</span>
         <span class="op-chip">${isDesktop ? "Desktop" : "Web preview"}</span>
       </div>
       <div class="op-field"><span class="lbl">${t(lang, "language")}</span>
@@ -66,12 +66,11 @@ export function mountSidebar(root) {
         <p class="op-help">The microphone is only on after you tap the circle, never in the background. <button type="button" class="op-btn ghost" id="op-warm" style="min-height:36px;padding:4px 10px;font-size:14px">Download local Whisper now</button> <span id="op-warm-status" class="op-help"></span></p></div>
       <div class="op-field"><label for="op-tts">${t(lang, "voiceMode")}</label>
         <select id="op-tts">
-          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic (free natural voice for English, ElevenLabs for other languages)</option>
-          <option value="elevenlabs" ${s().ttsProvider === "elevenlabs" ? "selected" : ""}>ElevenLabs premium voice for every language (needs key)</option>
-          <option value="kokoro" ${s().ttsProvider === "kokoro" ? "selected" : ""}>Natural voice on this computer (free, English)</option>
+          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic: natural English voice; the computer's best voice for other languages</option>
+          <option value="kokoro" ${s().ttsProvider === "kokoro" ? "selected" : ""}>Natural voice on this computer (free; English, Spanish, Hindi)</option>
           <option value="system" ${s().ttsProvider === "system" ? "selected" : ""}>System voice (free, all languages)</option>
         </select>
-        <p class="op-help">The natural voice is Kokoro, a small neural voice that runs on this computer after a one-time download (about 90 MB). <button type="button" class="op-btn ghost" id="op-warm-voice" style="min-height:36px;padding:4px 10px;font-size:14px">${kokoroState() === "ready" ? "Natural voice ready" : "Download natural voice"}</button> <span id="op-warm-voice-status" class="op-help"></span></p>
+        <p class="op-help">The natural voice is Kokoro, a small neural voice that runs on this computer after a one-time download (about 90 MB, plus about 18 MB for Spanish and Hindi pronunciation). <button type="button" class="op-btn ghost" id="op-warm-voice" style="min-height:36px;padding:4px 10px;font-size:14px">${kokoroState() === "ready" ? "Natural voice ready" : "Download natural voice"}</button> <span id="op-warm-voice-status" class="op-help"></span></p>
         <label for="op-style" style="font-weight:700;font-size:15px;color:var(--ink-2)">Voice character</label>
         <select id="op-style">
           <option value="warm" ${s().voiceStyle === "warm" ? "selected" : ""}>Warm (default)</option>
@@ -114,7 +113,7 @@ export function mountSidebar(root) {
         ${a.setupPaid ? "" : `<button class="op-btn" type="button" id="op-setup">${t(lang, "paySetup")}</button>`}
       </div>
       <div class="op-plan"><strong>Unit economics</strong>
-        <ul><li>Best quality, average month (8 questions a day): about $8.40 in total costs against $${a.monthlyPrice}</li><li>Lowest cost, average month: about $0.88 (English) to $3.32 (other languages)</li><li>Monthly allowances (600 Opus answers, 60,000 voice characters) keep heavy users under the price</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
+        <ul><li>Local only (default): about $0.66 a month, all of it card fees, however much it is used</li><li>With cloud, average month (8 questions a day): about $1.11 (Haiku first, Sonnet only for hard questions)</li><li>A monthly allowance of 300 expert answers keeps heavy users around $2.30</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
       <p class="op-help">Payments in this demo are simulated. Production uses Stripe Checkout for the setup fee and a Stripe subscription for the monthly plan.</p>`;
     },
 
@@ -122,15 +121,13 @@ export function mountSidebar(root) {
       ${isDesktop ? `<div class="op-field"><span class="lbl">Local only</span>
         <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="op-local" ${s().localOnly !== false ? "checked" : ""} style="width:22px;height:22px"> Nothing leaves this computer (recommended)</label>
         <p class="op-help">Listening, the voice, reading the screen, pointing, scam protection and the built-in guides all run on this computer. Settings stay in OpenPath's folder on this computer; conversations are not saved. The speech models are saved here once (<span id="op-offline-size">checking…</span>), then work without internet. Turn this off only to use cloud AI for questions the guides do not cover.</p></div>` : ""}
-      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath works with no keys at all, using built-in guides and the computer's own voices. Add keys to unlock Claude answers for any question, the warm ElevenLabs voice, or cloud Whisper. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
+      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath works with no keys at all, using built-in guides and the computer's own voices. Add a Claude key to answer harder questions the guides do not cover. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
       <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off">
         <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys.</p></div>
       <div class="op-field"><label for="op-model">Claude model</label>
         <select id="op-model">
-          ${[["", "Automatic: follows Quality (Opus 5.5, or Haiku 5.5 for lowest cost)"], ["claude-fable-5-1", "Claude Fable 5.1: the most capable, slowest and most expensive"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
+          ${[["", "Automatic: Haiku 5.5 first, Sonnet 5.5 for hard questions"], ["claude-fable-5-1", "Claude Fable 5.1: the most capable, slowest and most expensive"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
         </select></div>
-      <div class="op-field"><label for="op-k-eleven">ElevenLabs API key</label><input type="password" id="op-k-eleven" value="${esc(s().elevenLabsKey)}" placeholder="xi-…" autocomplete="off"></div>
-      <div class="op-field"><label for="op-k-voice">ElevenLabs voice ID</label><input type="text" id="op-k-voice" value="${esc(s().elevenLabsVoiceId)}"></div>
       <div class="op-field"><label for="op-k-openai">OpenAI API key (cloud Whisper, optional)</label><input type="password" id="op-k-openai" value="${esc(s().openaiKey)}" placeholder="sk-…" autocomplete="off"></div>
       <div class="op-field"><label for="op-pics">Pointing with screen pictures</label>
         <select id="op-pics">
@@ -162,37 +159,25 @@ export function mountSidebar(root) {
 
     costs: () => {
       const u = s().usage;
-      const isOpus = (s().qualityMode || "best") !== "low" && (s().modelChoice || "claude-opus-5-5") !== "claude-haiku-5-5";
-      const llm = (u.llmInputTokens / 1e6) * (isOpus ? PRICE.opusIn : PRICE.haikuIn) + (u.llmOutputTokens / 1e6) * (isOpus ? PRICE.opusOut : PRICE.haikuOut);
-      const tts = (u.ttsChars / 1000) * PRICE.elevenPer1k;
+      const m = s().modelChoice || ((s().qualityMode || "best") === "low" ? "claude-haiku-5-5" : "claude-sonnet-5-5");
+      const [pin, pout] = m.includes("haiku") ? [PRICE.haikuIn, PRICE.haikuOut] : m.includes("sonnet") ? [PRICE.sonnetIn, PRICE.sonnetOut] : [PRICE.opusIn, PRICE.opusOut];
+      const llm = (u.llmInputTokens / 1e6) * pin + (u.llmOutputTokens / 1e6) * pout;
       const stt = (s().sttProvider === "openai" ? u.sttSeconds / 60 : 0) * PRICE.whisperPerMin;
-      const total = llm + tts + stt;
-      const month = new Date().toISOString().slice(0, 7);
-      const usedMonth = u.ttsMonth === month ? u.ttsCharsMonth || 0 : 0;
-      const cap = s().ttsMonthlyCap ?? 60000;
+      const total = llm + stt;
       return `
       <div class="op-stats">
-        <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Estimated API spend, all time</div></div>
-        <div class="op-stat"><div class="n">${u.cacheHitsLLM + u.ttsCacheHits}</div><div class="l">Cache hits (free answers and audio)</div></div>
+        <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Cloud AI spend, all time (cloud mode only)</div></div>
         <div class="op-stat"><div class="n">${u.llmCalls}</div><div class="l">Claude calls · ${u.llmInputTokens + u.llmOutputTokens} tokens</div></div>
-        <div class="op-stat"><div class="n">${usedMonth.toLocaleString()}</div><div class="l">ElevenLabs characters this month, of ${cap.toLocaleString()}</div></div>
+        <div class="op-stat"><div class="n">${u.cacheHitsLLM}</div><div class="l">Answers reused from cache (free)</div></div>
         <div class="op-stat"><div class="n">${u.sttSeconds}s</div><div class="l">Speech heard (free on this computer)</div></div>
-        <div class="op-stat"><div class="n" id="op-cache-n">…</div><div class="l">Cached audio clips <span id="op-cache-b"></span></div></div>
       </div>
-      <div class="op-field"><label for="op-cap">Monthly ElevenLabs allowance</label>
-        <select id="op-cap">
-          ${[[30000, "30,000 characters (≈ $1.50)"], [60000, "60,000 characters (≈ $3, default)"], [120000, "120,000 characters (≈ $6)"], [0, "None: always the free voice"]].map(([v, l]) => `<option value="${v}" ${cap === v ? "selected" : ""}>${l}</option>`).join("")}
-        </select>
-        <p class="op-help">When the allowance is used up, OpenPath keeps talking with the free voice until next month.</p></div>
       <div class="op-field"><span class="lbl">How OpenPath keeps costs near zero</span>
         <ul class="op-help" style="padding-left:18px">
-          <li><b>Free voice first.</b> English uses Kokoro, a natural voice that runs on this computer. ElevenLabs is for other languages or the premium option.</li>
-          <li><b>Recorded guide voice.</b> Every built-in guide sentence is recorded once for all users, so those steps cost nothing to speak.</li>
+          <li><b>Free voices.</b> English, Spanish and Hindi use Kokoro, a natural voice that runs inside OpenPath on any computer. Chinese uses the computer's own voice.</li>
           <li><b>Free listening.</b> Whisper runs on this computer; your voice never leaves it.</li>
-          <li><b>Common tasks answer offline.</b> Logging in, Google Docs, Gmail, browser tabs: scripted steps, no tokens.</li>
-          <li><b>SHA-256 caches</b> for answers and audio, a 160-token answer cap, and Claude Haiku 5.5 by default.</li>
-        </ul></div>
-      <button class="op-btn" type="button" id="op-clear-cache">Clear audio cache</button>`;
+          <li><b>Common tasks need no AI.</b> Google sign-up, Google Docs, Gmail, browser tabs: built-in steps.</li>
+          <li><b>Cloud mode is optional and tiered.</b> Claude Haiku answers first; Sonnet only when Haiku's answer cannot be checked on screen, up to 300 times a month.</li>
+        </ul></div>`;
     },
   };
 
@@ -242,14 +227,11 @@ export function mountSidebar(root) {
     $("#op-setup")?.addEventListener("click", async () => { await saveSettings({ account: { setupPaid: true } }); logEvent({ type: "cost", title: "Setup fee paid", detail: `$${s().account.setupPrice} one-time (simulated checkout)` }); render(); });
 
     $("#op-save-keys")?.addEventListener("click", async () => {
-      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), elevenLabsKey: $("#op-k-eleven").value.trim(), elevenLabsVoiceId: $("#op-k-voice").value.trim(), openaiKey: $("#op-k-openai").value.trim(), modelChoice: $("#op-model").value });
-      logEvent({ type: "cost", title: "Keys saved", detail: [s().anthropicKey && "Claude", s().elevenLabsKey && "ElevenLabs", s().openaiKey && "Whisper cloud"].filter(Boolean).join(", ") || "No keys: offline mode" });
+      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), openaiKey: $("#op-k-openai").value.trim(), modelChoice: $("#op-model").value });
+      logEvent({ type: "cost", title: "Keys saved", detail: [s().anthropicKey && "Claude", s().openaiKey && "Whisper cloud"].filter(Boolean).join(", ") || "No keys: offline mode" });
       render();
     });
     $("#op-clear-hist")?.addEventListener("click", () => { state.history.length = 0; state.events.length = 0; render(); });
-    $("#op-cap")?.addEventListener("change", (e) => saveSettings({ ttsMonthlyCap: +e.target.value }));
-    $("#op-clear-cache")?.addEventListener("click", async () => { await native.ttsClearCache(); render(); });
-    if (tab === "costs") native.ttsCacheStats().then((c) => { const n = $("#op-cache-n"), b = $("#op-cache-b"); if (n) n.textContent = c.files; if (b) b.textContent = c.bytes ? `· ${(c.bytes / 1024).toFixed(0)} KB` : ""; });
   }
 
   on("settings", () => { if (open) render(); });

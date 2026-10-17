@@ -1,8 +1,9 @@
 // Instruction engine backed by Claude. The renderer has already redacted
 // sensitive data and run the scam guardrail before anything reaches here.
-// Quality first (Claude Opus 5.5 by default), with cost controls that do not
-// touch quality: a 35-word answer, an on-disk answer cache keyed by SHA-256,
-// prompt caching on the system prompt, and a monthly Opus allowance.
+// Cloud mode only (off by default). Haiku answers first and Sonnet takes over
+// when Haiku's answer cannot be checked on screen; plus a 35-word answer, an
+// on-disk answer cache keyed by SHA-256, prompt caching on the system prompt,
+// and a monthly allowance of expert answers.
 
 const Anthropic = require("@anthropic-ai/sdk");
 const crypto = require("crypto");
@@ -13,34 +14,41 @@ const store = require("./store");
 const vision = require("./vision");
 
 // ---------- Which model ----------
-// Best quality (default): Claude Opus 5.5, with Anthropic's server-side
-// fallback so a rare safety decline is retried on another model instead of
-// leaving the person without an answer. Lowest cost: Claude Haiku 5.5.
-// A monthly allowance of Opus calls keeps a very heavy user from costing more
-// than the subscription; past it, answers come from Haiku until next month.
-const BEST = "claude-opus-5-5", CHEAP = "claude-haiku-5-5";
+// Cloud mode answers in two tiers, to keep cost low without lowering quality:
+//   1. Claude Haiku 5.5 answers first (about 20x cheaper than Sonnet).
+//   2. OpenPath checks the button Haiku names is really on screen. Only when
+//      it is not does Claude Sonnet 5.5 (the "expert") answer instead.
+// A monthly allowance of expert answers (300 by default) keeps a very heavy
+// user's cost bounded; past it, Haiku's answer stands. "Lowest cost" uses
+// Haiku only; a model picked in Setup is used directly. Server-side fallback
+// retries a rare safety decline on another model (Sonnet / Opus / Fable).
+const BEST = "claude-sonnet-5-5", CHEAP = "claude-haiku-5-5";
 const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
 
-function modelFor(settings) {
-  if (settings.modelChoice) return settings.modelChoice;
-  if (settings.qualityMode === "low") return CHEAP;
-  const month = new Date().toISOString().slice(0, 7);
-  const used = settings.usage?.llmMonth === month ? settings.usage.bestCallsMonth || 0 : 0;
-  return used >= (settings.bestMonthlyCap ?? 600) ? CHEAP : BEST;
+function month() { return new Date().toISOString().slice(0, 7); }
+function expertLeft(settings) {
+  const used = settings.usage?.llmMonth === month() ? settings.usage.bestCallsMonth || 0 : 0;
+  return used < (settings.bestMonthlyCap ?? 300);
 }
+// The first model to ask, and whether a second (expert) try is allowed.
+function plan(settings) {
+  if (settings.modelChoice) return { first: settings.modelChoice, expert: null };
+  if (settings.qualityMode === "low") return { first: CHEAP, expert: null };
+  return { first: CHEAP, expert: expertLeft(settings) ? BEST : null };
+}
+function modelFor(settings) { return plan(settings).first; }
 
 function countCall(model) {
-  const u = store.getAll().usage, month = new Date().toISOString().slice(0, 7);
-  const prev = u.llmMonth === month ? u.bestCallsMonth || 0 : 0;
-  store.patch({ usage: { llmMonth: month, bestCallsMonth: prev + (model === CHEAP ? 0 : 1) } });
+  const u = store.getAll().usage;
+  const prev = u.llmMonth === month() ? u.bestCallsMonth || 0 : 0;
+  store.patch({ usage: { llmMonth: month(), bestCallsMonth: prev + (model === CHEAP ? 0 : 1) } });
 }
 
 // Sends a Messages request the way each model needs it.
 async function send(client, body, { effort } = {}) {
   const model = body.model;
-  if (model === CHEAP) return client.messages.create(body);
   const output_config = { ...(body.output_config || {}), ...(effort ? { effort } : {}) };
-  const req = { ...body, output_config, max_tokens: Math.max(body.max_tokens, 4000) };   // room for thinking
+  const req = { ...body, output_config, max_tokens: Math.max(body.max_tokens, model === CHEAP ? 2000 : 4000) };   // room for thinking
   if (FALLBACK_MODELS.has(model)) return client.beta.messages.create({ ...req, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
   return client.messages.create(req);
 }
@@ -102,7 +110,7 @@ async function instruct({ query, language, screen, history }, settings) {
   messages.push({ role: "user", content: `Language: ${language}\n${context}\nUser said: "${query}"` });
 
   try {
-    const model = modelFor(settings);
+    const model = modelFor(settings);   // Haiku first; no screen to check, so no expert retry
     const response = await send(client, {
       model,
       max_tokens: 160,
@@ -181,7 +189,16 @@ async function point({ query, language, history, frontTitle }, settings) {
     ],
   });
 
-  const model = modelFor(settings);
+  const { first, expert } = plan(settings);
+  const one = await askForStep(client, apiKey, shot, messages, first);
+  if (!one.ok) return one;
+  // Accept the answer when nothing needs clicking, or its button is really there.
+  if (!one.needsCheck || one.verified || !expert) return one;
+  const two = await askForStep(client, apiKey, shot, messages, expert);
+  return two.ok ? { ...two, escalated: true } : one;
+}
+
+async function askForStep(client, apiKey, shot, messages, model) {
   const base = {
     model,
     max_tokens: 400,
@@ -191,10 +208,10 @@ async function point({ query, language, history, frontTitle }, settings) {
 
   let response;
   try {
-    response = await send(client, { ...base, output_config: { format: { type: "json_schema", schema: POINT_SCHEMA } } }, { effort: "medium" });
+    response = await send(client, { ...base, output_config: { format: { type: "json_schema", schema: POINT_SCHEMA } } }, { effort: model === CHEAP ? "low" : "medium" });
   } catch (err) {
     if (err instanceof Anthropic.BadRequestError) {
-      // Older models without structured outputs: ask for JSON in words.
+      // Models without structured outputs: ask for JSON in words.
       try {
         response = await send(client, { ...base, messages: [...messages.slice(0, -1), { role: "user", content: [...messages[messages.length - 1].content, { type: "text", text: 'Reply with only a JSON object: {"say":"…","has_target":true,"target_label":"…","x":0,"y":0}' }] }] }, { effort: "medium" });
       } catch (e2) { return mapError(e2, apiKey); }
@@ -213,20 +230,21 @@ async function point({ query, language, history, frontTitle }, settings) {
   store.bumpUsage({ llmCalls: 1, llmInputTokens: response.usage?.input_tokens || 0, llmOutputTokens: response.usage?.output_tokens || 0 });
   countCall(model);
 
-  let target = null;
+  let target = null, verified = false;
+  const needsCheck = !!(data.has_target && data.target_label);
   if (data.has_target && Number.isFinite(data.x) && Number.isFinite(data.y)) {
     const guess = shot.toOverlay(data.x, data.y);
     target = { x: guess.x - 22, y: guess.y - 16, w: 44, h: 32, text: data.target_label || "" };
-    // Snap to the real word on screen when the label is readable text.
+    // Check the named button is really on screen, and snap to it.
     if (data.target_label && data.target_label.length <= 40) {
       const found = await vision.locate([data.target_label], guess);
       if (found.ok) {
         const c = { x: found.box.x + found.box.w / 2, y: found.box.y + found.box.h / 2 };
-        if (Math.hypot(c.x - guess.x, c.y - guess.y) < 160) target = found.box;
+        if (Math.hypot(c.x - guess.x, c.y - guess.y) < 160) { target = found.box; verified = true; }
       }
     }
   }
-  return { ok: true, text: data.say.trim(), target, usage: response.usage };
+  return { ok: true, text: data.say.trim(), target, verified, needsCheck, model, usage: response.usage };
 }
 
 function mapError(err, apiKey) {
