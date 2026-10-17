@@ -244,6 +244,20 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
 // graphics-chip version fails (most often the GPU dropped the model in a long
 // session), Whisper restarts on the main processor and tries the same
 // recording once more.
+// Whisper runs strictly one at a time: a second run started while one is in
+// flight makes the speech engine refuse ("Session already started").
+let whisperBusy = null;
+async function runWhisper(p, pcm, opts) {
+  while (whisperBusy) { try { await whisperBusy; } catch { /* the earlier run's own caller handles it */ } }
+  let timer;
+  const job = Promise.race([
+    p(pcm, opts),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Whisper took too long")), 30000); }),
+  ]);
+  whisperBusy = job;
+  try { return await job; } finally { clearTimeout(timer); if (whisperBusy === job) whisperBusy = null; }
+}
+
 export async function transcribeLocal(pcm, sampleRate, langCode, onStatus) {
   const mode = "local";
   onStatus && onStatus("transcribing");
@@ -254,7 +268,7 @@ export async function transcribeLocal(pcm, sampleRate, langCode, onStatus) {
     if (clean.seconds < 0.35) return { text: "", mode, reason: "silence" };
     const opts = { language: whisperLang(langCode), task: "transcribe", chunk_length_s: 30, stride_length_s: 5 };
     let out;
-    try { out = await p(clean.pcm, opts); }
+    try { out = await runWhisper(p, clean.pcm, opts); }
     catch (first) {
       console.error("OpenPath: Whisper failed, retrying on the CPU", first);
       logEvent({ type: "warn", title: "Speech model restarted", detail: String(first?.message || first).slice(0, 160) });
@@ -263,7 +277,7 @@ export async function transcribeLocal(pcm, sampleRate, langCode, onStatus) {
       localPipeline = null; localModelId = null;
       const cpu = await loadLocalWhisper((pct) => onStatus && onStatus(`loading model ${pct}%`));
       onStatus && onStatus("transcribing");
-      out = await cpu(clean.pcm, opts);
+      out = await runWhisper(cpu, clean.pcm, opts);
     }
     const text = cleanTranscript(out?.text);
     if (state.settings.usage) state.settings.usage.sttSeconds += Math.round(clean.seconds);
@@ -271,7 +285,8 @@ export async function transcribeLocal(pcm, sampleRate, langCode, onStatus) {
   } catch (e) {
     console.error("OpenPath: Whisper failed", e);
     logEvent({ type: "warn", title: "Local Whisper failed", detail: String(e?.message || e) });
-    return { text: "", mode, reason: "local_failed" };
+    // Both tries failed: the speech engine is stuck until the page reloads.
+    return { text: "", mode, reason: "local_failed", restart: true };
   }
 }
 

@@ -75,7 +75,7 @@ export async function startOverlay(root) {
   async function handleTap() {
     if (state.status === "locked") { circle.show(); return; }
     if (state.status === "listening") { stopRequested = true; return; }
-    if (state.status === "speaking") { stopSpeaking(); setIdle(); return; }
+    if (state.status === "speaking") { stopSpeaking(); sayToken++; setIdle(); }   // interrupt and listen
     if (state.status === "thinking") return;
 
     circle.show();
@@ -108,6 +108,9 @@ export async function startOverlay(root) {
         return;
       }
       if (result.reason === "local_failed") {
+        // The listening engine is stuck: reload OpenPath's window (a couple of
+        // seconds) so the next try starts clean.
+        if (result.restart) { logEvent({ type: "warn", title: "Listening restarted" }); setTimeout(() => location.reload(), 3500); }
         circle.setReply(t(lang(), "sttFailed"));
         circle.showTyping(); setIdle(); return;
       }
@@ -537,7 +540,9 @@ export async function startOverlay(root) {
     setStatus(keepLocked ? "locked" : "speaking"); circle.setStatus(keepLocked ? "locked" : "speaking");
     await speak(text, {});
     if (mine !== sayToken) return;
-    if (state.status !== "locked") setIdle();
+    // Only "speaking" goes back to idle: never cut short listening or the
+    // work on what the person just said.
+    if (state.status === "speaking") setIdle();
   }
 
   function setIdle() { setStatus("idle"); circle.setStatus("idle"); }
