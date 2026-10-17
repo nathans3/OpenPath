@@ -97,7 +97,7 @@ When OpenPath gives a step, a bright ring and an arrow appear on the button to p
 
 ## Cost per user
 
-See the team's cost analysis document. In short: about $0.90 a month for an English speaker and about $3.30 for other languages on an average month, against $15. ElevenLabs is the only large cost, so it comes after the free English voice and the pre-recorded guide voice, and it has a monthly cap.
+See the team's cost analysis document. In short: about $0.88 a month for an English speaker and about $3.32 for other languages on an average month, against $15. ElevenLabs is the only large cost, so it comes after the free English voice and the pre-recorded guide voice, and it has a monthly cap.
 
 ```bash
 ELEVENLABS_API_KEY=... npm run voice-pack   # records every built-in sentence once (~$1.13)

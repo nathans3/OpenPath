@@ -24,7 +24,7 @@ async function synthesize({ text, language, style }, settings) {
   const file = path.join(CACHE_DIR(), key + ".mp3");
   const month = new Date().toISOString().slice(0, 7);
   const used = settings.usage.ttsMonth === month ? settings.usage.ttsCharsMonth || 0 : 0;
-  if (!fs.existsSync(file) && used + text.length > (settings.ttsMonthlyCap ?? 40000)) return { ok: false, reason: "cap" };
+  if (!fs.existsSync(file) && used + text.length > (settings.ttsMonthlyCap ?? 60000)) return { ok: false, reason: "cap" };
   if (fs.existsSync(file)) {
     store.bumpUsage({ ttsCacheHits: 1 });
     return { ok: true, cached: true, audio: fs.readFileSync(file).toString("base64"), mime: "audio/mpeg" };

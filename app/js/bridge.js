@@ -11,7 +11,7 @@ const WEB_DEFAULTS = {
   language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000,
   sttProvider: "auto", ttsProvider: "auto",
   anthropicKey: "", elevenLabsKey: "", elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL", openaiKey: "",
-  model: "claude-haiku-5-5", screenPictures: "ask", ttsMonthlyCap: 40000,
+  model: "claude-haiku-5-5", screenPictures: "ask", ttsMonthlyCap: 60000,
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
   account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 15, setupPrice: 29 },
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
@@ -146,7 +146,7 @@ function webBridge() {
       if (hit) { bump({ ttsCacheHits: 1 }); return { ok: true, cached: true, audio: hit.audio, mime: "audio/mpeg" }; }
       const month = new Date().toISOString().slice(0, 7);
       const used = settings.usage.ttsMonth === month ? settings.usage.ttsCharsMonth || 0 : 0;
-      if (used + text.length > (settings.ttsMonthlyCap ?? 40000)) return { ok: false, reason: "cap" };
+      if (used + text.length > (settings.ttsMonthlyCap ?? 60000)) return { ok: false, reason: "cap" };
       try {
         const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`, {
           method: "POST",

@@ -35,7 +35,7 @@ export async function detectSttMode() {
   return "local";
 }
 
-// Whisper "base" is about 3x more accurate than "tiny" on everyday speech and
+// Whisper "base" makes roughly a third fewer word errors than "tiny" and
 // still runs on a laptop. With WebGPU (most Macs and recent PCs) it is fast;
 // otherwise a quantized build runs on the CPU.
 const WHISPER_MODEL = "onnx-community/whisper-base";

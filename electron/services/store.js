@@ -18,8 +18,8 @@ const DEFAULTS = {
   elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL",
   openaiKey: "",
   model: "claude-haiku-5-5",
-  screenPictures: "ask",
-  ttsMonthlyCap: 40000,         // ElevenLabs characters per month (≈ $2); then the free voice        // ask | on | off — may Claude see a picture of the screen to point?
+  screenPictures: "ask",        // ask | on | off — may Claude see a picture of the screen to point?
+  ttsMonthlyCap: 60000,         // ElevenLabs characters per month (≈ $3); then the free voice
   caregiverName: "",
   caregiverPhone: "",
   caregiverWebhook: "",

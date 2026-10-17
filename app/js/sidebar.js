@@ -104,7 +104,7 @@ export function mountSidebar(root) {
         ${a.setupPaid ? "" : `<button class="op-btn" type="button" id="op-setup">${t(lang, "paySetup")}</button>`}
       </div>
       <div class="op-plan"><strong>Unit economics</strong>
-        <ul><li>Average month (8 questions a day): about $0.90 in total costs for an English speaker and about $3.30 for other languages, against $${a.monthlyPrice}</li><li>Heaviest users stay under about $3 because the ElevenLabs allowance caps the only large cost</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
+        <ul><li>Average month (8 questions a day): about $0.88 in total costs for an English speaker and about $3.32 for other languages, against $${a.monthlyPrice}</li><li>Heavy users (40 questions a day) stay under about $4 because the ElevenLabs allowance caps the only large cost</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
       <p class="op-help">Payments in this demo are simulated. Production uses Stripe Checkout for the setup fee and a Stripe subscription for the monthly plan.</p>`;
     },
 
@@ -158,7 +158,7 @@ export function mountSidebar(root) {
       const total = llm + tts + stt;
       const month = new Date().toISOString().slice(0, 7);
       const usedMonth = u.ttsMonth === month ? u.ttsCharsMonth || 0 : 0;
-      const cap = s().ttsMonthlyCap ?? 40000;
+      const cap = s().ttsMonthlyCap ?? 60000;
       return `
       <div class="op-stats">
         <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Estimated API spend, all time</div></div>
@@ -170,7 +170,7 @@ export function mountSidebar(root) {
       </div>
       <div class="op-field"><label for="op-cap">Monthly ElevenLabs allowance</label>
         <select id="op-cap">
-          ${[[20000, "20,000 characters (≈ $1)"], [40000, "40,000 characters (≈ $2, default)"], [80000, "80,000 characters (≈ $4)"], [0, "None: always the free voice"]].map(([v, l]) => `<option value="${v}" ${cap === v ? "selected" : ""}>${l}</option>`).join("")}
+          ${[[30000, "30,000 characters (≈ $1.50)"], [60000, "60,000 characters (≈ $3, default)"], [120000, "120,000 characters (≈ $6)"], [0, "None: always the free voice"]].map(([v, l]) => `<option value="${v}" ${cap === v ? "selected" : ""}>${l}</option>`).join("")}
         </select>
         <p class="op-help">When the allowance is used up, OpenPath keeps talking with the free voice until next month.</p></div>
       <div class="op-field"><span class="lbl">How OpenPath keeps costs near zero</span>
