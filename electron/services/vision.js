@@ -190,6 +190,7 @@ async function locate(labels, near, exclude) {
     }
     if (!ownWindowsInPicture) exclude = [];                      // the helper already left OpenPath out
     matches = matches.filter((m) => !isAddress(m.text));        // never the browser's address bar
+    matches = matches.filter((m) => m.exact || m.word);         // whole words only: "Day" is not the "day" in "birthday"
     const W = display.size.width, H = display.size.height;
     const scored = matches.map((m) => ({ x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, m }))
       .filter((b) => !insideAny(b.x + b.w / 2, b.y + b.h / 2, exclude))
