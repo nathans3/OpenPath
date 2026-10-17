@@ -1,6 +1,6 @@
 # OpenPath
 
-A floating voice helper for older adults. One glowing circle sits on top of whatever is on the screen. Tap it, say what you are trying to do, and OpenPath answers out loud with one clear step at a time and points at what to click. It runs entirely on your computer, speaks English, Spanish, Chinese and Hindi, and refuses to help with scams.
+A floating voice helper for older adults. One glowing circle sits on top of whatever is on the screen. Tap it, say what you are trying to do, and OpenPath answers out loud with one clear step at a time and points at what to click. It answers with Claude, listens and speaks on your computer, speaks English, Spanish, Chinese and Hindi, and refuses to help with scams.
 
 Desktop app for macOS and Windows (Electron). The same interface also runs in a browser as a web preview.
 
@@ -35,15 +35,16 @@ The first time, macOS asks for three permissions. Allow them in System Settings 
 
 **From the code (developers):** `npm install` then `npm start`. `OPENPATH_LAB=1 npm start` also opens the old Test Lab practice screens.
 
-## Fully local
+## How it answers
 
-"Local only" is on by default (Settings → Setup):
+OpenPath answers with Claude.
 
-- Listening (Whisper), the voice (Kokoro, or the computer's own voices), reading the screen (macOS Vision), pointing, scam protection and all guides run on this computer.
-- The speech models, libraries and fonts download once the first time they are needed, then load from this computer. Every other connection from OpenPath is blocked, and Claude and cloud Whisper are never called.
-- Settings and caches live in OpenPath's folder on this computer. Conversations are not saved. Screen captures are read in memory and never stored.
-
-Turning "Local only" off and adding an Anthropic key in Setup lets OpenPath answer questions the built-in guides do not cover, using Claude Sonnet 5.5 and a picture of the screen (asked once, never on bank, health or password pages).
+- Claude Haiku 5.5 answers first. OpenPath checks that the button it names is really on the screen. Claude Sonnet 5.5 answers only when that check fails, up to 300 times a month per user.
+- The Google sign-up guide and the other built-in guides answer instantly without calling Claude.
+- Add the Claude key once in Settings → Setup. Without a key, only the built-in guides answer.
+- Listening (Whisper), the voice (Kokoro, or the computer's own voice for Chinese), reading the screen, pointing and scam protection run on this computer.
+- Before any words go to Claude, passwords, card numbers and other private details are removed. Claude sees a picture of the screen only with permission, never on bank, health or password pages, and pictures are never saved.
+- OpenPath's windows download only their own parts (speech models, libraries, fonts) and the caregiver alert. Everything else from the windows is blocked.
 
 ## Speed
 
@@ -88,11 +89,11 @@ app/
 - **Consent:** the microphone only opens after a deliberate tap and closes by itself after a pause (adjustable 1.2–4.5 s) or 20 s. Nothing streams in the background.
 - **Redaction before anything leaves the device:** passwords, Social Security numbers, card numbers (Luhn-checked), account numbers, one-time codes, dates of birth and emails are replaced with placeholders. Logged in History so a caregiver can see it happened.
 - **Scam interception:** the user's words and the on-screen cues are scored for fake tech support, prizes, gift cards, wire transfers, remote access, government threats, urgency and secrecy. Above the threshold the circle and sidebar lock red, OpenPath refuses, and an alert is logged and optionally POSTed to a caregiver webhook (Zapier, IFTTT, your server).
-- **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Claude Haiku first in cloud mode. The Costs tab shows the running estimate.
+- **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Claude Haiku first, Sonnet only when needed. The Costs tab shows the running estimate.
 
 ### Business model (Account tab)
 
-7-day free trial, then **$10/month** (OpenPath Family) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
+7-day free trial, then **$7.99/month** (OpenPath Family, one plan) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
 
 ## Pointing at what to click
 
@@ -104,7 +105,7 @@ When OpenPath gives a step, a bright ring and an arrow appear on the button to p
 
 ## Cost per user
 
-See the team's cost analysis document. In short: $0.66 per user a month at a $10 price, all of it card fees, however much OpenPath is used. Voices are free: Kokoro for English, Spanish and Hindi on any computer, and the computer's own voice for Chinese.
+See the team's cost analysis document. In short, at $7.99 a month an average user costs about $1.04 (87% margin) and a heavy user about $2.23 (72% margin). Card fees are $0.59 of that; the rest is Claude. Voices are free: Kokoro for English, Spanish and Hindi on any computer, and the computer's own voice for Chinese.
 
 Note for the team: the Spanish and Hindi pronunciation step uses espeak-ng, which is GPL-3.0 licensed. OpenPath downloads it at run time instead of bundling it. Check the license before selling a packaged version.
 

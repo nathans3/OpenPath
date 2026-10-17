@@ -32,12 +32,7 @@ export function mountSidebar(root) {
 
   const PANELS = {
     voice: (lang) => `
-      <div class="op-field"><span class="lbl">Quality</span>
-        <div class="op-langs">
-          <button type="button" data-quality="best" aria-pressed="${(s().qualityMode || "best") !== "low"}"><span>Best quality</span><small>Whisper small, natural English voice; with cloud: Claude Haiku 5.5, Sonnet 5.5 for hard questions</small></button>
-          <button type="button" data-quality="low" aria-pressed="${s().qualityMode === "low"}"><span>Lowest cost</span><small>Whisper base; with cloud: Claude Haiku 5.5</small></button>
-        </div>
-        <p class="op-help">Full answers to any question need an Anthropic API key, added once in the Setup tab. Without one, OpenPath uses its built-in guides.</p></div>
+      <p class="op-help">OpenPath answers with Claude: Haiku 5.5 first, and Sonnet 5.5 when a question is hard. It needs a Claude key, added once in the Setup tab. The Google sign-up guide is built in and answers instantly.</p>
       <div class="op-status-line">
         <span class="op-chip ${state.sttMode === "typed" ? "warn" : "ok"}">🎙 ${sttLabel()}</span>
         <span class="op-chip ${state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${state.ttsMode === "kokoro" ? "Natural voice (on this computer)" : "Computer voice"}</span>
@@ -60,13 +55,12 @@ export function mountSidebar(root) {
         <select id="op-stt">
           <option value="auto" ${s().sttProvider === "auto" ? "selected" : ""}>Automatic (best free option)</option>
           <option value="local" ${s().sttProvider === "local" ? "selected" : ""}>Whisper on this computer (private, free)</option>
-          <option value="openai" ${s().sttProvider === "openai" ? "selected" : ""}>Whisper cloud (needs OpenAI key)</option>
           <option value="typed" ${s().sttProvider === "typed" ? "selected" : ""}>Keyboard only</option>
         </select>
         <p class="op-help">The microphone is only on after you tap the circle, never in the background. <button type="button" class="op-btn ghost" id="op-warm" style="min-height:36px;padding:4px 10px;font-size:14px">Download local Whisper now</button> <span id="op-warm-status" class="op-help"></span></p></div>
       <div class="op-field"><label for="op-tts">${t(lang, "voiceMode")}</label>
         <select id="op-tts">
-          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic: natural English voice; the computer's best voice for other languages</option>
+          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic: natural voice for English, Spanish and Hindi; the computer's voice for Chinese</option>
           <option value="kokoro" ${s().ttsProvider === "kokoro" ? "selected" : ""}>Natural voice on this computer (free; English, Spanish, Hindi)</option>
           <option value="system" ${s().ttsProvider === "system" ? "selected" : ""}>System voice (free, all languages)</option>
         </select>
@@ -113,22 +107,18 @@ export function mountSidebar(root) {
         ${a.setupPaid ? "" : `<button class="op-btn" type="button" id="op-setup">${t(lang, "paySetup")}</button>`}
       </div>
       <div class="op-plan"><strong>Unit economics</strong>
-        <ul><li>Local only (default): about $0.66 a month, all of it card fees, however much it is used</li><li>With cloud, average month (8 questions a day): about $1.11 (Haiku first, Sonnet only for hard questions)</li><li>A monthly allowance of 300 expert answers keeps heavy users around $2.30</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
+        <ul><li>Average month (8 questions a day): about $1.04 per user (Haiku first, Sonnet only for hard questions)</li><li>A monthly allowance of 300 Sonnet answers keeps heavy users around $2.23</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.59 of each $${a.monthlyPrice} payment</li><li>Voices and listening run on the computer and cost nothing</li></ul></div>
       <p class="op-help">Payments in this demo are simulated. Production uses Stripe Checkout for the setup fee and a Stripe subscription for the monthly plan.</p>`;
     },
 
     keys: () => `
-      ${isDesktop ? `<div class="op-field"><span class="lbl">Local only</span>
-        <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="op-local" ${s().localOnly !== false ? "checked" : ""} style="width:22px;height:22px"> Nothing leaves this computer (recommended)</label>
-        <p class="op-help">Listening, the voice, reading the screen, pointing, scam protection and the built-in guides all run on this computer. Settings stay in OpenPath's folder on this computer; conversations are not saved. The speech models are saved here once (<span id="op-offline-size">checking…</span>), then work without internet. Turn this off only to use cloud AI for questions the guides do not cover.</p></div>` : ""}
-      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath works with no keys at all, using built-in guides and the computer's own voices. Add a Claude key to answer harder questions the guides do not cover. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
+      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath answers questions with Claude, so it needs a Claude key. Only the built-in guides work without one. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
       <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off">
         <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys.</p></div>
       <div class="op-field"><label for="op-model">Claude model</label>
         <select id="op-model">
           ${[["", "Automatic: Haiku 5.5 first, Sonnet 5.5 for hard questions"], ["claude-fable-5-1", "Claude Fable 5.1: the most capable, slowest and most expensive"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
         </select></div>
-      <div class="op-field"><label for="op-k-openai">OpenAI API key (cloud Whisper, optional)</label><input type="password" id="op-k-openai" value="${esc(s().openaiKey)}" placeholder="sk-…" autocomplete="off"></div>
       <div class="op-field"><label for="op-pics">Pointing with screen pictures</label>
         <select id="op-pics">
           <option value="ask" ${(s().screenPictures || "ask") === "ask" ? "selected" : ""}>Ask me the first time</option>
@@ -166,17 +156,17 @@ export function mountSidebar(root) {
       const total = llm + stt;
       return `
       <div class="op-stats">
-        <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Cloud AI spend, all time (cloud mode only)</div></div>
+        <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Claude spend, all time</div></div>
         <div class="op-stat"><div class="n">${u.llmCalls}</div><div class="l">Claude calls · ${u.llmInputTokens + u.llmOutputTokens} tokens</div></div>
         <div class="op-stat"><div class="n">${u.cacheHitsLLM}</div><div class="l">Answers reused from cache (free)</div></div>
         <div class="op-stat"><div class="n">${u.sttSeconds}s</div><div class="l">Speech heard (free on this computer)</div></div>
       </div>
-      <div class="op-field"><span class="lbl">How OpenPath keeps costs near zero</span>
+      <div class="op-field"><span class="lbl">How OpenPath keeps costs low</span>
         <ul class="op-help" style="padding-left:18px">
           <li><b>Free voices.</b> English, Spanish and Hindi use Kokoro, a natural voice that runs inside OpenPath on any computer. Chinese uses the computer's own voice.</li>
           <li><b>Free listening.</b> Whisper runs on this computer; your voice never leaves it.</li>
           <li><b>Common tasks need no AI.</b> Google sign-up, Google Docs, Gmail, browser tabs: built-in steps.</li>
-          <li><b>Cloud mode is optional and tiered.</b> Claude Haiku answers first; Sonnet only when Haiku's answer cannot be checked on screen, up to 300 times a month.</li>
+          <li><b>Cheapest model first.</b> Claude Haiku answers first; Sonnet only when Haiku's answer cannot be checked on screen, up to 300 times a month.</li>
         </ul></div>`;
     },
   };
@@ -192,7 +182,6 @@ export function mountSidebar(root) {
     }
     const $ = (sel) => side.querySelector(sel);
 
-    side.querySelectorAll("[data-quality]").forEach((b) => b.addEventListener("click", async () => { await saveSettings({ qualityMode: b.dataset.quality }); render(); }));
     $("[data-lang]") && side.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", async () => { await saveSettings({ language: b.dataset.lang }); render(); }));
     $("#op-rate")?.addEventListener("change", (e) => saveSettings({ voiceRate: +e.target.value }));
     $("#op-pause")?.addEventListener("change", (e) => { saveSettings({ autoSilenceMs: +e.target.value }); });
@@ -207,8 +196,6 @@ export function mountSidebar(root) {
       render();
     });
     $("#op-sample")?.addEventListener("click", () => speak(t(L(), "sample")));
-    $("#op-local")?.addEventListener("change", (e) => saveSettings({ localOnly: e.target.checked }));
-    if ($("#op-offline-size") && native.offlineStats) native.offlineStats().then((st) => { const el = $("#op-offline-size"); if (el) el.textContent = st.files ? `${st.files} files, ${(st.bytes / 1e6).toFixed(0)} MB saved` : "not saved yet; happens the first time you use them"; });
     $("#op-pics")?.addEventListener("change", (e) => saveSettings({ screenPictures: e.target.value }));
     $("#op-follow-perm")?.addEventListener("click", async () => { await native.requestClickPermission(); setTimeout(render, 1500); });
     if ($("#op-follow-chip") && native.followStatus) native.followStatus().then((st) => { const c = $("#op-follow-chip"); if (!c) return; c.textContent = st.clicks ? "Clicks: on" : "Clicks: watching the screen"; c.className = "op-chip " + (st.clicks ? "ok" : ""); if (st.clicks) { const b = $("#op-follow-perm"); if (b) b.hidden = true; } });
@@ -227,8 +214,8 @@ export function mountSidebar(root) {
     $("#op-setup")?.addEventListener("click", async () => { await saveSettings({ account: { setupPaid: true } }); logEvent({ type: "cost", title: "Setup fee paid", detail: `$${s().account.setupPrice} one-time (simulated checkout)` }); render(); });
 
     $("#op-save-keys")?.addEventListener("click", async () => {
-      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), openaiKey: $("#op-k-openai").value.trim(), modelChoice: $("#op-model").value });
-      logEvent({ type: "cost", title: "Keys saved", detail: [s().anthropicKey && "Claude", s().openaiKey && "Whisper cloud"].filter(Boolean).join(", ") || "No keys: offline mode" });
+      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), modelChoice: $("#op-model").value });
+      logEvent({ type: "cost", title: "Keys saved", detail: s().anthropicKey ? "Claude" : "No Claude key: only built-in guides will answer" });
       render();
     });
     $("#op-clear-hist")?.addEventListener("click", () => { state.history.length = 0; state.events.length = 0; render(); });

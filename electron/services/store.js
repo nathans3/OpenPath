@@ -18,8 +18,7 @@ const DEFAULTS = {
   openaiKey: "",
   qualityMode: "best",          // best | low
   modelChoice: "",              // "" = follow qualityMode; or a specific Claude model id
-  bestMonthlyCap: 300,          // expert (Sonnet) answers per month in cloud mode; then Haiku's answer stands
-  localOnly: true,              // nothing leaves this computer; cloud AI is off even with a key
+  bestMonthlyCap: 300,          // expert (Sonnet) answers per month; then Haiku's answer stands
   hideFromRecordings: false,    // true = OpenPath does not appear in screen recordings or screen sharing
   screenPictures: "ask",        // ask | on | off — may Claude see a picture of the screen to point?
   caregiverName: "",
@@ -29,7 +28,7 @@ const DEFAULTS = {
     plan: "trial",
     trialStartedAt: null,
     setupPaid: false,
-    monthlyPrice: 10,
+    monthlyPrice: 7.99,
     setupPrice: 29,
   },
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, sttSeconds: 0, cacheHitsLLM: 0, llmMonth: "", bestCallsMonth: 0 },
@@ -44,6 +43,7 @@ function getAll() {
   // Prices always come from the app, never from an older saved file.
   const account = { ...DEFAULTS.account, ...(raw.account || {}), monthlyPrice: DEFAULTS.account.monthlyPrice, setupPrice: DEFAULTS.account.setupPrice };
   const merged = { ...DEFAULTS, ...raw, account, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
+  delete merged.localOnly;                 // local-only mode was removed; OpenPath always answers with Claude
   if (!merged.account.trialStartedAt) {
     merged.account.trialStartedAt = new Date().toISOString();
     write(merged);

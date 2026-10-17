@@ -1,6 +1,6 @@
 // Instruction engine backed by Claude. The renderer has already redacted
 // sensitive data and run the scam guardrail before anything reaches here.
-// Cloud mode only (off by default). Haiku answers first and Sonnet takes over
+// Answers every question the built-in guides do not cover. Haiku answers first and Sonnet takes over
 // when Haiku's answer cannot be checked on screen; plus a 35-word answer, an
 // on-disk answer cache keyed by SHA-256, prompt caching on the system prompt,
 // and a monthly allowance of expert answers.
@@ -14,7 +14,7 @@ const store = require("./store");
 const vision = require("./vision");
 
 // ---------- Which model ----------
-// Cloud mode answers in two tiers, to keep cost low without lowering quality:
+// Answers come in two tiers, to keep cost low without lowering quality:
 //   1. Claude Haiku 5.5 answers first (about 20x cheaper than Sonnet).
 //   2. OpenPath checks the button Haiku names is really on screen. Only when
 //      it is not does Claude Sonnet 5.5 (the "expert") answer instead.
@@ -81,8 +81,8 @@ function writeCache(key, value) {
 }
 
 async function instruct({ query, language, screen, history }, settings) {
-  const { client, apiKey, localOnly } = makeClient(settings);
-  if (!client) return { ok: false, reason: localOnly ? "local_only" : "no_key" };
+  const { client, apiKey } = makeClient(settings);
+  if (!client) return { ok: false, reason: "no_key" };
 
   const normalized = query.trim().toLowerCase().replace(/\s+/g, " ");
   // The cache key covers what is on screen and the last exchange, so "done"
@@ -163,7 +163,6 @@ function hasProfile() {
   try { return fs.existsSync(path.join(require("os").homedir(), ".config", "anthropic")); } catch { return false; }
 }
 function makeClient(settings) {
-  if (settings.localOnly !== false) return { client: null, apiKey: "", localOnly: true };   // nothing leaves this computer
   const apiKey = (settings.anthropicKey || process.env.ANTHROPIC_API_KEY || "").trim();
   if (!apiKey && !process.env.ANTHROPIC_AUTH_TOKEN && !hasProfile()) return { client: null, apiKey };
   try { return { client: apiKey ? new Anthropic({ apiKey }) : new Anthropic(), apiKey }; } catch { return { client: null, apiKey }; }
@@ -172,8 +171,8 @@ function makeClient(settings) {
 function available(settings) { return !!makeClient(settings).client; }
 
 async function point({ query, language, history, frontTitle }, settings) {
-  const { client, apiKey, localOnly } = makeClient(settings);
-  if (!client) return { ok: false, reason: localOnly ? "local_only" : "no_key" };
+  const { client, apiKey } = makeClient(settings);
+  if (!client) return { ok: false, reason: "no_key" };
   if (vision.isSensitive(frontTitle)) return { ok: false, reason: "sensitive" };
 
   let shot;
