@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenPath</title>
+  <link rel="stylesheet" href="css/overlay.css">
+</head>
+<body class="op-overlay-body">
+  <div id="op-root"></div>
+  <script type="module">
+    import { startOverlay } from "./js/app.js";
+    startOverlay(document.getElementById("op-root"));
+  </script>
+</body>
+</html>
