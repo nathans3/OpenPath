@@ -7,7 +7,8 @@
 //   6. plain fallback prompt
 import { native } from "./bridge.js";
 import { state, logEvent } from "./bus.js";
-import { redact, detectScam, refusalText, scoreText } from "./guardrails.js";
+import { redact, detectScam, refusalText, scoreText, isSensitiveTitle } from "./guardrails.js";
+import { t } from "./i18n.js";
 import { findWorkflow, workflowStep, fallbackText, isAdvance, isRepeat, hasOfflineLanguage } from "./knowledge.js";
 
 let active = null;   // { found, index, lang, screenId }
@@ -103,6 +104,25 @@ export async function respond(rawQuery) {
   // History sent to Claude: earlier turns only (the current question is sent
   // separately), with the visible window titles as screen context.
   const history = state.history.slice(-5, -1);
+
+  // 5a. On the real screen, Claude can look at a picture of it and point.
+  // Only with the person's permission, never on bank/health/password pages.
+  if (screen?.live && screen.windows?.length) {
+    const pictures = state.settings.screenPictures || "ask";
+    const front = screen.windows[0];
+    if (pictures !== "off" && !isSensitiveTitle(front) && native.aiAvailable && (await native.aiAvailable())) {
+      if (pictures === "ask") return { text: t(lang, "consentPictures"), consent: true, source: "offline" };
+      const pr = await native.point({ query, language: lang, history, frontTitle: front });
+      if (pr.ok) {
+        active = null;
+        logEvent({ type: "cost", title: "Claude looked at your screen", detail: `${pr.usage?.input_tokens || 0} in / ${pr.usage?.output_tokens || 0} out tokens. The picture was not saved.` });
+        return { text: pr.text, source: "claude", point: pr.target || null };
+      }
+      if (pr.reason && !["no_key", "sensitive"].includes(pr.reason)) logEvent({ type: "warn", title: "Couldn't use a screen picture", detail: `${pr.reason}. Answering from window names instead.` });
+    }
+  }
+
+  // 5b. Text only: window titles as context.
   const res = await native.instruct({ query, language: lang, screen, history });
   if (res.ok) {
     active = null;

@@ -12,6 +12,10 @@ export const LANGUAGES = [
 
 const STRINGS = {
   en: {
+    clickHere: "Click here",
+    consentPictures: "To point at the exact spot, I need to show Claude a picture of your screen. I never do this on bank, health or password pages. Is that okay?",
+    allowPictures: "Yes, that's okay",
+    denyPictures: "No pictures",
     transcribing: "Writing down what you said…",
     gettingReady: "Getting ready to listen ({p})…",
     addKey: "Add Claude key",
@@ -52,6 +56,10 @@ const STRINGS = {
     cachedNote: "Answer reused from cache (no cost).",
   },
   es: {
+    clickHere: "Haga clic aquí",
+    consentPictures: "Para señalar el lugar exacto, necesito mostrarle a Claude una foto de su pantalla. Nunca lo hago en páginas del banco, de salud o de contraseñas. ¿Le parece bien?",
+    allowPictures: "Sí, está bien",
+    denyPictures: "Sin fotos",
     transcribing: "Anotando lo que dijo…",
     gettingReady: "Preparándome para escuchar ({p})…",
     addKey: "Poner clave de Claude",
@@ -92,6 +100,10 @@ const STRINGS = {
     cachedNote: "Respuesta reutilizada de la caché (sin costo).",
   },
   zh: {
+    clickHere: "点这里",
+    consentPictures: "为了指出要点的确切位置，我需要把您屏幕的照片给 Claude 看。在银行、医疗或密码页面上我绝不会这样做。可以吗？",
+    allowPictures: "可以",
+    denyPictures: "不要照片",
     transcribing: "正在记下您说的话…",
     gettingReady: "正在准备听您说话（{p}）…",
     addKey: "添加 Claude 密钥",
@@ -132,6 +144,10 @@ const STRINGS = {
     cachedNote: "回答来自缓存（无费用）。",
   },
   hi: {
+    clickHere: "यहाँ क्लिक कीजिए",
+    consentPictures: "सही जगह की तरफ़ इशारा करने के लिए मुझे Claude को आपकी स्क्रीन की तस्वीर दिखानी होगी। बैंक, सेहत या पासवर्ड वाले पेजों पर मैं ऐसा कभी नहीं करती। क्या यह ठीक है?",
+    allowPictures: "हाँ, ठीक है",
+    denyPictures: "तस्वीर नहीं",
     transcribing: "आपकी बात लिख रही हूँ…",
     gettingReady: "सुनने की तैयारी हो रही है ({p})…",
     addKey: "Claude कुंजी जोड़ें",
@@ -185,3 +201,8 @@ export function langInfo(code) {
 }
 
 export function hasFullUi(code) { return !!STRINGS[code]; }
+
+// Fixed interface sentences that are spoken aloud (for the voice pack).
+export function STRINGS_FOR_VOICE(lang) {
+  return ["sample", "didntCatch", "noMic", "consentPictures"].map((k) => t(lang, k));
+}

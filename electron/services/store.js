@@ -18,6 +18,8 @@ const DEFAULTS = {
   elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL",
   openaiKey: "",
   model: "claude-haiku-5-5",
+  screenPictures: "ask",
+  ttsMonthlyCap: 40000,         // ElevenLabs characters per month (≈ $2); then the free voice        // ask | on | off — may Claude see a picture of the screen to point?
   caregiverName: "",
   caregiverPhone: "",
   caregiverWebhook: "",
@@ -25,10 +27,10 @@ const DEFAULTS = {
     plan: "trial",
     trialStartedAt: null,
     setupPaid: false,
-    monthlyPrice: 19,
+    monthlyPrice: 15,
     setupPrice: 29,
   },
-  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
+  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0, ttsMonth: "", ttsCharsMonth: 0 },
 };
 
 function readRaw() {
@@ -37,7 +39,9 @@ function readRaw() {
 
 function getAll() {
   const raw = readRaw();
-  const merged = { ...DEFAULTS, ...raw, account: { ...DEFAULTS.account, ...(raw.account || {}) }, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
+  // Prices always come from the app, never from an older saved file.
+  const account = { ...DEFAULTS.account, ...(raw.account || {}), monthlyPrice: DEFAULTS.account.monthlyPrice, setupPrice: DEFAULTS.account.setupPrice };
+  const merged = { ...DEFAULTS, ...raw, account, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
   if (!merged.account.trialStartedAt) {
     merged.account.trialStartedAt = new Date().toISOString();
     write(merged);

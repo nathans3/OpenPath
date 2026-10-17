@@ -520,6 +520,28 @@ const W = {
   },
 };
 
+
+// Words to point at for each step (as they appear on screen; English first,
+// then other interface languages). null = nothing to point at.
+const TARGETS = {
+  portal_login: [["Username"], ["Username"], ["Password"], ["Sign In"], ["Test Results"]],
+  portal_forgot: [["Forgot username or password?", "Forgot username"], null],
+  bank_balance: [["Everyday Checking"], ["Savings"]],
+  bank_paybill: [["Pay bills"], ["City Electric"], ["Amount"]],
+  bank_signout: [["Sign out"]],
+  video_camera: [["Start video"], null],
+  video_mute: [["Mute"]],
+  video_leave: [["Leave"]],
+  email_pharmacy: [["Riverside Pharmacy"]],
+  email_statement: [["Harbor Community Bank"]],
+  open_mail: [["Mail"]],
+  call_family: [["FamilyCall"]],
+  docs_new_tab: [["Insert", "Insertar", "插入"], ["Tab", "Pestaña", "标签页"], null],
+  docs_new_doc: [["File", "Archivo", "文件"], ["New", "Nuevo", "新建"]],
+  docs_share: [["Share", "Compartir", "共享"], ["Send", "Enviar", "发送"]],
+  gmail_compose: [["Compose", "Redactar", "写邮件"], ["To", "Para", "收件人"], ["Send", "Enviar", "发送"]],
+};
+
 const FALLBACK = {
   en: {
     withScreen: (title) => `This is the practice screen "${title}". Tell me in a few words what you'd like to do, for example "log in" or "pay a bill", and I'll guide you one step at a time.`,
@@ -622,7 +644,8 @@ export function workflowStep(found, index, lang) {
   if (found.wf.dynamic) return { text: found.wf.dynamic(L), index: 0, total: 1, last: true };
   const steps = found.wf.steps[L];
   const i = Math.min(index, steps.length - 1);
-  return { text: steps[i].replaceAll("{mod}", MOD), index: i, total: steps.length, last: i === steps.length - 1 };
+  const target = TARGETS[found.id]?.[i] || null;
+  return { text: steps[i].replaceAll("{mod}", MOD), index: i, total: steps.length, last: i === steps.length - 1, target };
 }
 
 // reason: why no answer was found ("no_key", "offline", or null).
@@ -642,3 +665,23 @@ export function fallbackText(lang, screen, { reason = null, query = "" } = {}) {
 }
 
 export function hasOfflineLanguage(lang) { return !!W.portal_login.steps[lang]; }
+
+// Every fixed sentence OpenPath can speak from its built-in guides, per
+// language, with both keyboard wordings. Used to pre-record the voice pack.
+export function allGuideSentences() {
+  const out = {};
+  for (const lang of Object.keys(W.portal_login.steps)) {
+    const set = new Set();
+    for (const wf of Object.values(W)) {
+      if (!wf.steps) continue;
+      for (const text of wf.steps[lang] || []) {
+        if (text.includes("{mod}")) { set.add(text.replaceAll("{mod}", "Command")); set.add(text.replaceAll("{mod}", "Control")); }
+        else set.add(text);
+      }
+    }
+    for (const k of ["noScreen", "noPermission", "offline"]) set.add(FALLBACK[lang][k]);
+    set.add(FALLBACK[lang].needKey(null));
+    out[lang] = [...set];
+  }
+  return out;
+}

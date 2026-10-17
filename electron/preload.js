@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("openpathNative", {
   setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
 
   instruct: (payload) => ipcRenderer.invoke("ai:instruct", payload),
+  point: (payload) => ipcRenderer.invoke("ai:point", payload),
+  aiAvailable: () => ipcRenderer.invoke("ai:available"),
+  locate: (labels, near) => ipcRenderer.invoke("screen:locate", { labels, near }),
   speak: (payload) => ipcRenderer.invoke("tts:speak", payload),
   ttsCacheStats: () => ipcRenderer.invoke("tts:cacheStats"),
   ttsClearCache: () => ipcRenderer.invoke("tts:clearCache"),

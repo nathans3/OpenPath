@@ -5,7 +5,7 @@ import { LANGUAGES, t, hasFullUi } from "./i18n.js";
 import { speak, warmLocalWhisper, warmKokoro, kokoroState } from "./speech.js";
 import { hasOfflineLanguage } from "./knowledge.js";
 
-const PRICE = { haikuIn: 0.10, haikuOut: 0.50, opusIn: 4, opusOut: 20, elevenPer1k: 0.03, whisperPerMin: 0.006 };
+const PRICE = { haikuIn: 0.10, haikuOut: 0.50, opusIn: 4, opusOut: 20, elevenPer1k: 0.05, whisperPerMin: 0.006 };
 
 export function mountSidebar(root) {
   const side = document.createElement("aside");
@@ -26,7 +26,7 @@ export function mountSidebar(root) {
     side.innerHTML = `
       <div class="op-side-head"><h2>${t(lang, "settings")}</h2><button class="close" type="button" aria-label="Close">✕</button></div>
       <div class="op-tabs" role="tablist">${TABS.map((k) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${t(lang, "tab" + k[0].toUpperCase() + k.slice(1))}</button>`).join("")}</div>
-      <div class="op-panel">${PANELS[tab](lang)}</div>`;
+      <div class="op-panel op-enter">${PANELS[tab](lang)}</div>`;
     wire();
   }
 
@@ -34,7 +34,7 @@ export function mountSidebar(root) {
     voice: (lang) => `
       <div class="op-status-line">
         <span class="op-chip ${state.sttMode === "typed" ? "warn" : "ok"}">🎙 ${sttLabel()}</span>
-        <span class="op-chip ${state.ttsMode === "elevenlabs" || state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${{ elevenlabs: "ElevenLabs", kokoro: "Natural voice (local)", system: "System voice" }[state.ttsMode] || "System voice"}</span>
+        <span class="op-chip ${state.ttsMode === "elevenlabs" || state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${{ elevenlabs: "ElevenLabs", kokoro: "Natural voice (local)", pack: "Recorded voice", system: "System voice" }[state.ttsMode] || "System voice"}</span>
         <span class="op-chip">${isDesktop ? "Desktop" : "Web preview"}</span>
       </div>
       <div class="op-field"><span class="lbl">${t(lang, "language")}</span>
@@ -58,8 +58,8 @@ export function mountSidebar(root) {
         <p class="op-help">The microphone is only on after you tap the circle, never in the background. <button type="button" class="op-btn ghost" id="op-warm" style="min-height:36px;padding:4px 10px;font-size:14px">Download local Whisper now</button> <span id="op-warm-status" class="op-help"></span></p></div>
       <div class="op-field"><label for="op-tts">${t(lang, "voiceMode")}</label>
         <select id="op-tts">
-          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic (ElevenLabs if key → natural local voice → system)</option>
-          <option value="elevenlabs" ${s().ttsProvider === "elevenlabs" ? "selected" : ""}>ElevenLabs (needs key)</option>
+          <option value="auto" ${s().ttsProvider === "auto" ? "selected" : ""}>Automatic (free natural voice for English, ElevenLabs for other languages)</option>
+          <option value="elevenlabs" ${s().ttsProvider === "elevenlabs" ? "selected" : ""}>ElevenLabs premium voice for every language (needs key)</option>
           <option value="kokoro" ${s().ttsProvider === "kokoro" ? "selected" : ""}>Natural voice on this computer (free, English)</option>
           <option value="system" ${s().ttsProvider === "system" ? "selected" : ""}>System voice (free, all languages)</option>
         </select>
@@ -104,7 +104,7 @@ export function mountSidebar(root) {
         ${a.setupPaid ? "" : `<button class="op-btn" type="button" id="op-setup">${t(lang, "paySetup")}</button>`}
       </div>
       <div class="op-plan"><strong>Unit economics</strong>
-        <ul><li>Typical question: 0 tokens (built-in workflow) or about 450 in / 60 out tokens on Claude Haiku ≈ $0.00008</li><li>Typical spoken answer: 140 characters on ElevenLabs Flash ≈ $0.004, then free from cache</li><li>Heavy user (40 questions/day, 50% cached): under $2.50/month in API cost against $${a.monthlyPrice} revenue</li></ul></div>
+        <ul><li>Average month (8 questions a day): about $0.90 in total costs for an English speaker and about $3.30 for other languages, against $${a.monthlyPrice}</li><li>Heaviest users stay under about $3 because the ElevenLabs allowance caps the only large cost</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
       <p class="op-help">Payments in this demo are simulated. Production uses Stripe Checkout for the setup fee and a Stripe subscription for the monthly plan.</p>`;
     },
 
@@ -121,13 +121,20 @@ export function mountSidebar(root) {
       <div class="op-field"><label for="op-k-eleven">ElevenLabs API key</label><input type="password" id="op-k-eleven" value="${esc(s().elevenLabsKey)}" placeholder="xi-…" autocomplete="off"></div>
       <div class="op-field"><label for="op-k-voice">ElevenLabs voice ID</label><input type="text" id="op-k-voice" value="${esc(s().elevenLabsVoiceId)}"></div>
       <div class="op-field"><label for="op-k-openai">OpenAI API key (cloud Whisper, optional)</label><input type="password" id="op-k-openai" value="${esc(s().openaiKey)}" placeholder="sk-…" autocomplete="off"></div>
+      <div class="op-field"><label for="op-pics">Pointing with screen pictures</label>
+        <select id="op-pics">
+          <option value="ask" ${(s().screenPictures || "ask") === "ask" ? "selected" : ""}>Ask me the first time</option>
+          <option value="on" ${s().screenPictures === "on" ? "selected" : ""}>Allowed (never on bank, health or password pages)</option>
+          <option value="off" ${s().screenPictures === "off" ? "selected" : ""}>Never send pictures</option>
+        </select>
+        <p class="op-help">For questions the built-in guides do not cover, Claude can look at a picture of your screen to point at the right button. Built-in guides point using your computer's own text reader, which never leaves this computer.</p></div>
       <button class="op-btn primary" type="button" id="op-save-keys">Save keys</button>
       <div class="op-field"><span class="lbl">Privacy and consent</span>
         <ul class="op-help" style="padding-left:18px">
           <li>Audio is captured only after a deliberate tap, and stops on its own.</li>
           <li>Passwords, Social Security numbers, card and account numbers, one-time codes, dates of birth and emails are removed on this computer before any text goes to Claude.</li>
           <li>With local Whisper (default on desktop) your voice never leaves this computer.</li>
-          <li>No screenshots are taken. "Screen context" is the Test Lab's description of the practice screen.</li>
+          <li>Window names are read only after you tap. Screen pictures for Claude need your permission, are skipped on bank, health and password pages, and are never saved. Built-in pointing reads the screen with your computer's own text reader and nothing leaves the computer.</li>
         </ul></div>
       ${isDesktop ? "" : `<p class="op-help">In the shared web preview, outside services are blocked by the page sandbox, so keys only take effect in the desktop app or when you run the web build yourself.</p>`}`,
 
@@ -147,30 +154,38 @@ export function mountSidebar(root) {
       const isOpus = s().model === "claude-opus-5-5";
       const llm = (u.llmInputTokens / 1e6) * (isOpus ? PRICE.opusIn : PRICE.haikuIn) + (u.llmOutputTokens / 1e6) * (isOpus ? PRICE.opusOut : PRICE.haikuOut);
       const tts = (u.ttsChars / 1000) * PRICE.elevenPer1k;
-      const stt = (u.sttSeconds / 60) * PRICE.whisperPerMin;
+      const stt = (s().sttProvider === "openai" ? u.sttSeconds / 60 : 0) * PRICE.whisperPerMin;
       const total = llm + tts + stt;
+      const month = new Date().toISOString().slice(0, 7);
+      const usedMonth = u.ttsMonth === month ? u.ttsCharsMonth || 0 : 0;
+      const cap = s().ttsMonthlyCap ?? 40000;
       return `
       <div class="op-stats">
         <div class="op-stat"><div class="n">$${total.toFixed(4)}</div><div class="l">Estimated API spend, all time</div></div>
         <div class="op-stat"><div class="n">${u.cacheHitsLLM + u.ttsCacheHits}</div><div class="l">Cache hits (free answers and audio)</div></div>
         <div class="op-stat"><div class="n">${u.llmCalls}</div><div class="l">Claude calls · ${u.llmInputTokens + u.llmOutputTokens} tokens</div></div>
-        <div class="op-stat"><div class="n">${u.ttsChars}</div><div class="l">ElevenLabs characters billed</div></div>
-        <div class="op-stat"><div class="n">${u.sttSeconds}s</div><div class="l">Audio transcribed</div></div>
+        <div class="op-stat"><div class="n">${usedMonth.toLocaleString()}</div><div class="l">ElevenLabs characters this month, of ${cap.toLocaleString()}</div></div>
+        <div class="op-stat"><div class="n">${u.sttSeconds}s</div><div class="l">Speech heard (free on this computer)</div></div>
         <div class="op-stat"><div class="n" id="op-cache-n">…</div><div class="l">Cached audio clips <span id="op-cache-b"></span></div></div>
       </div>
+      <div class="op-field"><label for="op-cap">Monthly ElevenLabs allowance</label>
+        <select id="op-cap">
+          ${[[20000, "20,000 characters (≈ $1)"], [40000, "40,000 characters (≈ $2, default)"], [80000, "80,000 characters (≈ $4)"], [0, "None: always the free voice"]].map(([v, l]) => `<option value="${v}" ${cap === v ? "selected" : ""}>${l}</option>`).join("")}
+        </select>
+        <p class="op-help">When the allowance is used up, OpenPath keeps talking with the free voice until next month.</p></div>
       <div class="op-field"><span class="lbl">How OpenPath keeps costs near zero</span>
         <ul class="op-help" style="padding-left:18px">
-          <li><b>Common workflows answer offline.</b> Logging in, paying a bill, turning on the camera: scripted steps, no tokens.</li>
-          <li><b>SHA-256 answer cache.</b> The same question on the same screen in the same language is never sent to Claude twice.</li>
-          <li><b>SHA-256 audio cache.</b> Every spoken sentence is stored once; repeats are free. Cache key = voice + language + style + text.</li>
-          <li><b>Hard caps.</b> 160 output tokens per answer, 20-second listening limit, no streaming audio in the background.</li>
-          <li><b>Cheapest models.</b> Claude Haiku 5.5, ElevenLabs Flash v2.5 at 32 kbps, Whisper tiny on-device.</li>
+          <li><b>Free voice first.</b> English uses Kokoro, a natural voice that runs on this computer. ElevenLabs is for other languages or the premium option.</li>
+          <li><b>Recorded guide voice.</b> Every built-in guide sentence is recorded once for all users, so those steps cost nothing to speak.</li>
+          <li><b>Free listening.</b> Whisper runs on this computer; your voice never leaves it.</li>
+          <li><b>Common tasks answer offline.</b> Logging in, Google Docs, Gmail, browser tabs: scripted steps, no tokens.</li>
+          <li><b>SHA-256 caches</b> for answers and audio, a 160-token answer cap, and Claude Haiku 5.5 by default.</li>
         </ul></div>
       <button class="op-btn" type="button" id="op-clear-cache">Clear audio cache</button>`;
     },
   };
 
-  function sttLabel() { return { webspeech: "Browser speech", local: "Whisper on device", openai: "Whisper cloud", typed: "Keyboard", detecting: "Detecting…" }[state.sttMode] || state.sttMode; }
+  function sttLabel() { return { webspeech: "Browser speech", local: state.sttEngine || "Whisper on device", openai: "Whisper cloud", typed: "Keyboard", detecting: "Detecting…" }[state.sttMode] || state.sttMode; }
 
   function wire() {
     side.querySelector(".close").addEventListener("click", () => api.close());
@@ -183,7 +198,7 @@ export function mountSidebar(root) {
 
     $("[data-lang]") && side.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", async () => { await saveSettings({ language: b.dataset.lang }); render(); }));
     $("#op-rate")?.addEventListener("change", (e) => saveSettings({ voiceRate: +e.target.value }));
-    $("#op-pause")?.addEventListener("input", (e) => { saveSettings({ autoSilenceMs: +e.target.value }); });
+    $("#op-pause")?.addEventListener("change", (e) => { saveSettings({ autoSilenceMs: +e.target.value }); });
     $("#op-stt")?.addEventListener("change", (e) => saveSettings({ sttProvider: e.target.value }));
     $("#op-tts")?.addEventListener("change", (e) => saveSettings({ ttsProvider: e.target.value }));
     $("#op-style")?.addEventListener("change", (e) => saveSettings({ voiceStyle: e.target.value }));
@@ -195,6 +210,7 @@ export function mountSidebar(root) {
     });
     $("#op-sample")?.addEventListener("click", () => speak(t(L(), "sample")));
     $("#op-lab")?.addEventListener("click", () => native.openLab());
+    $("#op-pics")?.addEventListener("change", (e) => saveSettings({ screenPictures: e.target.value }));
     $("#op-get-key")?.addEventListener("click", () => native.openExternal("https://console.anthropic.com/settings/keys"));
     $("#op-screen-perm")?.addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
     $("#op-warm")?.addEventListener("click", async () => {
@@ -217,6 +233,7 @@ export function mountSidebar(root) {
       render();
     });
     $("#op-clear-hist")?.addEventListener("click", () => { state.history.length = 0; state.events.length = 0; render(); });
+    $("#op-cap")?.addEventListener("change", (e) => saveSettings({ ttsMonthlyCap: +e.target.value }));
     $("#op-clear-cache")?.addEventListener("click", async () => { await native.ttsClearCache(); render(); });
     if (tab === "costs") native.ttsCacheStats().then((c) => { const n = $("#op-cache-n"), b = $("#op-cache-b"); if (n) n.textContent = c.files; if (b) b.textContent = c.bytes ? `· ${(c.bytes / 1024).toFixed(0)} KB` : ""; });
   }

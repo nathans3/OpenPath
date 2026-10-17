@@ -11,9 +11,9 @@ const WEB_DEFAULTS = {
   language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000,
   sttProvider: "auto", ttsProvider: "auto",
   anthropicKey: "", elevenLabsKey: "", elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL", openaiKey: "",
-  model: "claude-haiku-5-5",
+  model: "claude-haiku-5-5", screenPictures: "ask", ttsMonthlyCap: 40000,
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
-  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 19, setupPrice: 29 },
+  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 15, setupPrice: 29 },
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
 };
 
@@ -74,7 +74,7 @@ Rules:
 
 function webBridge() {
   let settings = { ...WEB_DEFAULTS, ...lsGet("openpath-settings", {}) };
-  settings.account = { ...WEB_DEFAULTS.account, ...(settings.account || {}) };
+  settings.account = { ...WEB_DEFAULTS.account, ...(settings.account || {}), monthlyPrice: WEB_DEFAULTS.account.monthlyPrice, setupPrice: WEB_DEFAULTS.account.setupPrice };
   settings.usage = { ...WEB_DEFAULTS.usage, ...(settings.usage || {}) };
   if (!settings.account.trialStartedAt) { settings.account.trialStartedAt = new Date().toISOString(); lsSet("openpath-settings", settings); }
   const answerCache = lsGet("openpath-answers", {});
@@ -144,6 +144,9 @@ function webBridge() {
       const key = await sha256(`${voiceId}|${language}|${style}|${text}`);
       const hit = await dbGet(key);
       if (hit) { bump({ ttsCacheHits: 1 }); return { ok: true, cached: true, audio: hit.audio, mime: "audio/mpeg" }; }
+      const month = new Date().toISOString().slice(0, 7);
+      const used = settings.usage.ttsMonth === month ? settings.usage.ttsCharsMonth || 0 : 0;
+      if (used + text.length > (settings.ttsMonthlyCap ?? 40000)) return { ok: false, reason: "cap" };
       try {
         const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`, {
           method: "POST",
@@ -157,6 +160,7 @@ function webBridge() {
         const audio = btoa(bin);
         await dbPut(key, { audio, at: Date.now() });
         bump({ ttsChars: text.length });
+        settings.usage.ttsMonth = month; settings.usage.ttsCharsMonth = used + text.length; lsSet("openpath-settings", settings);
         return { ok: true, cached: false, audio, mime: "audio/mpeg" };
       } catch (e) { return { ok: false, reason: "offline", detail: String(e?.message || e) }; }
     },
@@ -180,6 +184,30 @@ function webBridge() {
         return { ok: true, text: (data.text || "").trim() };
       } catch (e) { return { ok: false, reason: "offline", detail: String(e?.message || e) }; }
     },
+
+    // The web preview cannot see other windows, but it can point at the
+    // practice screen on the same page by searching its text.
+    async locate(labels, near) {
+      const stage = document.getElementById("lab-stage");
+      if (!stage) return { ok: false, reason: "no_stage" };
+      const wanted = (labels || []).filter(Boolean).map((l) => l.toLowerCase());
+      const hits = [];
+      for (const el of stage.querySelectorAll("button, a, label, li, h2, h3, .n, td, span, b, input")) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        const own = (el.innerText || el.placeholder || "").trim().toLowerCase().split("\n")[0];
+        for (const [i, w] of wanted.entries()) {
+          if (!own.includes(w)) continue;
+          let score = (own === w ? 100 : own.startsWith(w) ? 60 : 30) - i * 5 - el.querySelectorAll("*").length;
+          if (near) score -= Math.hypot(r.x + r.width / 2 - near.x, r.y + r.height / 2 - near.y) / 8;
+          hits.push({ score, box: { x: r.x, y: r.y, w: r.width, h: r.height, text: labels[i], space: "page" } });
+        }
+      }
+      hits.sort((a, b) => b.score - a.score);
+      return hits.length ? { ok: true, box: hits[0].box } : { ok: false, reason: "not_found" };
+    },
+    async point() { return { ok: false, reason: "web" }; },
+    async aiAvailable() { return !!(settings.anthropicKey || "").trim(); },
 
     async openLab() { emit("web:openLab"); return true; },
     publishScreen(state) { emit("lab:screen", state); },

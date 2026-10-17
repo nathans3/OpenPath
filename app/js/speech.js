@@ -35,6 +35,11 @@ export async function detectSttMode() {
   return "local";
 }
 
+// Whisper "base" is about 3x more accurate than "tiny" on everyday speech and
+// still runs on a laptop. With WebGPU (most Macs and recent PCs) it is fast;
+// otherwise a quantized build runs on the CPU.
+const WHISPER_MODEL = "onnx-community/whisper-base";
+
 async function loadLocalWhisper(onProgress) {
   if (localPipeline) return localPipeline;
   if (localLoading) return localLoading;
@@ -42,14 +47,55 @@ async function loadLocalWhisper(onProgress) {
     const mod = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3/dist/transformers.min.js");
     const { pipeline, env } = mod;
     env.allowLocalModels = false;
-    const p = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny", {
-      dtype: "q8",
-      progress_callback: (ev) => { if (ev.status === "progress" && onProgress) onProgress(Math.round(ev.progress || 0)); },
-    });
+    const progress_callback = (ev) => { if (ev.status === "progress" && onProgress) onProgress(Math.round(ev.progress || 0)); };
+    let p = null;
+    if (navigator.gpu) {
+      try {
+        p = await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
+          device: "webgpu", dtype: { encoder_model: "fp32", decoder_model_merged: "q4" }, progress_callback,
+        });
+        state.sttEngine = "Whisper base (GPU)";
+      } catch { p = null; }
+    }
+    if (!p) {
+      p = await pipeline("automatic-speech-recognition", WHISPER_MODEL, { dtype: "q8", progress_callback });
+      state.sttEngine = "Whisper base (CPU)";
+    }
     localPipeline = p;
     return p;
   })();
   try { return await localLoading; } finally { localLoading = null; }
+}
+
+// Cleans a recording before Whisper hears it: cuts the silence at both ends
+// (Whisper invents words in silence) and raises quiet voices to a steady level.
+function prepareAudio(pcm, sampleRate) {
+  const frame = Math.round(sampleRate * 0.02);
+  const energies = [];
+  let loud = 0;
+  for (let i = 0; i + frame <= pcm.length; i += frame) {
+    let sum = 0; for (let j = i; j < i + frame; j++) sum += pcm[j] * pcm[j];
+    const e = Math.sqrt(sum / frame); energies.push(e); if (e > loud) loud = e;
+  }
+  const threshold = Math.max(0.006, loud * 0.12);
+  let first = energies.findIndex((e) => e > threshold);
+  let last = energies.length - 1 - [...energies].reverse().findIndex((e) => e > threshold);
+  if (first < 0) return { pcm: new Float32Array(0), seconds: 0 };
+  const padFrames = 15;                                   // keep 0.3 s around the speech
+  first = Math.max(0, first - padFrames); last = Math.min(energies.length - 1, last + padFrames);
+  const out = pcm.slice(first * frame, (last + 1) * frame);
+  let peak = 0; for (let i = 0; i < out.length; i++) peak = Math.max(peak, Math.abs(out[i]));
+  const gain = peak > 0 ? Math.min(8, 0.9 / peak) : 1;
+  if (gain > 1.05) for (let i = 0; i < out.length; i++) out[i] *= gain;
+  return { pcm: out, seconds: out.length / sampleRate };
+}
+
+// Phrases Whisper is known to "hear" in near-silence or noise.
+const HALLUCINATIONS = /^(\s*[\[(].*[\])]\s*|thank you\.?|thanks for watching!?|thank you for watching\.?|you\.?|bye\.?|okay\.?|\.+|subtitles by .*|music|♪+.*)$/i;
+function cleanTranscript(text) {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  if (!t || HALLUCINATIONS.test(t)) return "";
+  return t;
 }
 
 export function warmLocalWhisper(onProgress) {
@@ -140,7 +186,7 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
   if (mode === "webspeech") {
     return new Promise((resolve) => {
       const rec = new SR();
-      rec.lang = lang.bcp; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+      rec.lang = lang.bcp; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 3;
       let finalText = "", timer = null, spoke = false, done = false;
       const stopTimer = () => { if (timer) clearTimeout(timer); };
       const bump = () => { stopTimer(); timer = setTimeout(() => rec.stop(), spoke ? silenceMs : 7000); };
@@ -162,7 +208,7 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
         if (e.error === "not-allowed" || e.error === "service-not-allowed") resolve({ text: "", mode, reason: "mic_denied" });
         else resolve({ text: finalText.trim(), mode, reason: e.error });
       };
-      rec.onend = () => { if (done) return; done = true; stopTimer(); clearTimeout(hardStop); clearInterval(poll); resolve({ text: finalText.trim(), mode, reason: finalText ? null : "silence" }); };
+      rec.onend = () => { if (done) return; done = true; stopTimer(); clearTimeout(hardStop); clearInterval(poll); const text = cleanTranscript(finalText); resolve({ text, mode, reason: text ? null : "silence" }); };
       try { rec.start(); } catch { done = true; resolve({ text: "", mode, reason: "mic_denied" }); }
     });
   }
@@ -175,8 +221,10 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
 
   if (mode === "openai") {
     onStatus && onStatus("transcribing");
-    const res = await native.transcribe({ audioBase64: pcmToWavBase64(rec.pcm, rec.sampleRate), mime: "audio/wav", language: lang.code, durationSec: rec.durationSec });
-    if (res.ok) return { text: res.text, mode };
+    const clean = prepareAudio(rec.pcm, rec.sampleRate);
+    if (clean.seconds < 0.35) return { text: "", mode, reason: "silence" };
+    const res = await native.transcribe({ audioBase64: pcmToWavBase64(clean.pcm, rec.sampleRate), mime: "audio/wav", language: lang.code, durationSec: clean.seconds });
+    if (res.ok) { const text = cleanTranscript(res.text); return { text, mode, reason: text ? null : "silence" }; }
     logEvent({ type: "warn", title: "Whisper (cloud) failed", detail: res.reason });
     return { text: "", mode, reason: res.reason };
   }
@@ -185,9 +233,12 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
   onStatus && onStatus("transcribing");
   try {
     const p = await loadLocalWhisper((pct) => onStatus && onStatus(`loading model ${pct}%`));
-    const out = await p(rec.pcm, { language: whisperLang(lang.code), task: "transcribe", chunk_length_s: 20 });
-    const text = (out?.text || "").trim();
-    state.settings.usage.sttSeconds += Math.round(rec.durationSec);
+    onStatus && onStatus("transcribing");
+    const clean = prepareAudio(rec.pcm, rec.sampleRate);
+    if (clean.seconds < 0.35) return { text: "", mode, reason: "silence" };
+    const out = await p(clean.pcm, { language: whisperLang(lang.code), task: "transcribe", chunk_length_s: 30, stride_length_s: 5 });
+    const text = cleanTranscript(out?.text);
+    state.settings.usage.sttSeconds += Math.round(clean.seconds);
     return { text, mode, reason: text ? null : "silence" };
   } catch (e) {
     logEvent({ type: "warn", title: "Local Whisper failed", detail: String(e?.message || e) });
@@ -267,23 +318,40 @@ export function stopSpeaking() {
   currentUtterance = null;
 }
 
+// Voice order, cheapest good option first:
+//   1. The pre-recorded voice pack (built-in guide sentences, all languages): free.
+//   2. English: Kokoro, a natural neural voice on this computer: free.
+//   3. ElevenLabs, cached by SHA-256 and capped per month: paid.
+//      With "ElevenLabs (premium)" chosen, it is used for English too.
+//   4. The operating system's best voice: free.
+let voicePack = null;
+async function loadVoicePack() {
+  if (voicePack) return voicePack;
+  try { voicePack = (await import("../voice/manifest.js")).default || {}; } catch { voicePack = {}; }
+  return voicePack;
+}
+
+async function packClip(text, lang, style) {
+  const pack = await loadVoicePack();
+  if (!Object.keys(pack).length) return null;
+  const key = await sha256(`${lang}|${style}|${text}`);
+  return pack[key] ? new URL(`../voice/${pack[key]}`, import.meta.url).href : null;
+}
+
 export async function speak(text, { onStart, onEnd } = {}) {
   stopSpeaking();
   const lang = langInfo(state.settings.language || "en");
+  const style = state.settings.voiceStyle || "warm";
   const pref = state.settings.ttsProvider || "auto";
   const hasKey = !!(state.settings.elevenLabsKey || "").trim();
 
-  if ((pref === "auto" || pref === "elevenlabs") && hasKey) {
-    const res = await native.speak({ text, language: lang.code, style: state.settings.voiceStyle || "warm" });
-    if (res.ok) {
-      state.ttsMode = "elevenlabs";
-      logEvent({ type: "cost", title: res.cached ? "Voice played from cache" : "Voice generated", detail: res.cached ? "0 characters billed" : `${text.length} characters billed` });
-      return playBase64(res.audio, res.mime, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 });
-    }
-    if (res.reason === "bad_key") logEvent({ type: "warn", title: "ElevenLabs key rejected", detail: "Falling back to the local voice" });
+  // 1. Voice pack
+  if (pref !== "system") {
+    const clip = await packClip(text, lang.code, style);
+    if (clip) { state.ttsMode = "pack"; return playUrl(clip, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 }); }
   }
 
-  // Kokoro speaks English. Other languages go to the system voice.
+  // 2. Kokoro for English (unless premium ElevenLabs is chosen)
   if ((pref === "auto" || pref === "kokoro") && lang.code === "en") {
     if (!kokoro && !kokoroFailed && !kokoroLoading) warmKokoro();           // start the download for next time
     if (kokoro) {
@@ -292,8 +360,33 @@ export async function speak(text, { onStart, onEnd } = {}) {
     }
   }
 
+  // 3. ElevenLabs
+  if ((pref === "auto" || pref === "elevenlabs") && hasKey) {
+    const res = await native.speak({ text, language: lang.code, style });
+    if (res.ok) {
+      state.ttsMode = "elevenlabs";
+      logEvent({ type: "cost", title: res.cached ? "Voice played from cache" : "Voice generated", detail: res.cached ? "0 characters billed" : `${text.length} characters billed` });
+      return playBase64(res.audio, res.mime, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 });
+    }
+    if (res.reason === "bad_key") logEvent({ type: "warn", title: "ElevenLabs key rejected", detail: "Falling back to the free voice" });
+    if (res.reason === "cap") logEvent({ type: "cost", title: "Monthly voice allowance used", detail: "Using the free voice until next month. Change the allowance in Settings → Costs." });
+  }
+
+  // 4. System voice
   state.ttsMode = "system";
   return speakSystem(text, lang, { onStart, onEnd });
+}
+
+function playUrl(url, { onStart, onEnd, rate }) {
+  return new Promise((resolve) => {
+    const audio = new Audio(url);
+    audio.playbackRate = Math.max(0.7, Math.min(1.2, rate));
+    currentAudio = audio;
+    audio.onplay = () => onStart && onStart();
+    audio.onended = () => { currentAudio = null; onEnd && onEnd(); resolve(true); };
+    audio.onerror = () => { currentAudio = null; onEnd && onEnd(); resolve(false); };
+    audio.play().catch(() => { onEnd && onEnd(); resolve(false); });
+  });
 }
 
 function playBase64(b64, mime, { onStart, onEnd, rate }) {

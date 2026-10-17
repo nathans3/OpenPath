@@ -21,6 +21,7 @@ const path = require("path");
 const store = require("./services/store");
 const anthropic = require("./services/anthropic");
 const tts = require("./services/tts");
+const vision = require("./services/vision");
 const stt = require("./services/stt");
 
 let overlay = null;
@@ -29,11 +30,19 @@ let tray = null;
 
 // ---------- Overlay window (circle + sidebar) ----------
 function createOverlay() {
+  // The overlay covers the whole primary display (menu bar included) so the
+  // pointer can reach anything, and stays click-through except over the
+  // circle, card and sidebar.
   const display = screen.getPrimaryDisplay();
-  const { x, y, width, height } = display.workArea;
+  const { x, y, width, height } = display.bounds;
 
   overlay = new BrowserWindow({
     x, y, width, height,
+    // A non-activating panel on macOS: clicking the circle or the card does
+    // not take focus away from the app the person is using, so an open menu
+    // in that app stays open while they press "I did it".
+    ...(process.platform === "darwin" ? { type: "panel" } : {}),
+    enableLargerThanScreen: true,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -56,6 +65,10 @@ function createOverlay() {
   // Float above full-screen apps and follow the user across Spaces.
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Keep OpenPath itself out of screen captures, so the circle and card never
+  // hide or confuse what OpenPath is looking for.
+  overlay.setContentProtection(true);
+  overlay.setBounds(display.bounds);
 
   // Start click-through; the renderer tells us when the cursor is over
   // something interactive (the circle, the sidebar, a card) and we toggle.
@@ -67,8 +80,7 @@ function createOverlay() {
   // Keep the overlay matched to the display if resolution or dock changes.
   screen.on("display-metrics-changed", () => {
     if (!overlay) return;
-    const wa = screen.getPrimaryDisplay().workArea;
-    overlay.setBounds(wa);
+    overlay.setBounds(screen.getPrimaryDisplay().bounds);
   });
 }
 
@@ -125,6 +137,9 @@ ipcMain.handle("settings:get", () => store.getAll());
 ipcMain.handle("settings:set", (_e, patch) => store.patch(patch));
 
 ipcMain.handle("ai:instruct", (_e, payload) => anthropic.instruct(payload, store.getAll()));
+ipcMain.handle("ai:point", (_e, payload) => anthropic.point(payload, store.getAll()));
+ipcMain.handle("ai:available", () => anthropic.available(store.getAll()));
+ipcMain.handle("screen:locate", (_e, { labels, near }) => vision.locate(labels, near));
 ipcMain.handle("tts:speak", (_e, payload) => tts.synthesize(payload, store.getAll()));
 ipcMain.handle("tts:cacheStats", () => tts.cacheStats());
 ipcMain.handle("tts:clearCache", () => tts.clearCache());
@@ -179,6 +194,8 @@ app.whenReady().then(() => {
   createTray();
   createLab();
 });
+
+app.on("will-quit", () => vision.cleanup());
 
 app.on("window-all-closed", () => {
   // Keep running in the tray like a background utility.
