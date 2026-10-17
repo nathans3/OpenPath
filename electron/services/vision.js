@@ -189,6 +189,7 @@ async function locate(labels, near, exclude) {
       matches = res.matches; ownWindowsInPicture = true;
     }
     if (!ownWindowsInPicture) exclude = [];                      // the helper already left OpenPath out
+    matches = matches.filter((m) => !isAddress(m.text));        // never the browser's address bar
     const W = display.size.width, H = display.size.height;
     const scored = matches.map((m) => ({ x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, m }))
       .filter((b) => !insideAny(b.x + b.w / 2, b.y + b.h / 2, exclude))
@@ -213,6 +214,14 @@ async function locate(labels, near, exclude) {
 
 // Every one of `labels` that is visible, each with its best box. Used to tell
 // which page of a website is showing.
+// A web address or file path (one unbroken run with "/", "?" or "="), such as
+// the browser's address bar "accounts.google.com/…/signup/username?TL=…".
+// Words inside it are never the thing to click.
+function isAddress(text) {
+  const t = (text || "").trim();
+  return !/\s/.test(t) && /[./]/.test(t) && /[/?=]/.test(t);
+}
+
 async function findAll(labels, exclude) {
   if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
   const list = (labels || []).filter(Boolean).slice(0, 60);
@@ -231,6 +240,7 @@ async function findAll(labels, exclude) {
     }
     const W = display.size.width, H = display.size.height, best = new Map();
     for (const m of matches) {
+      if (isAddress(m.text)) continue;
       const box = { x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, text: m.label };
       if (insideAny(box.x + box.w / 2, box.y + box.h / 2, exclude)) continue;
       const score = m.exact ? 2 : m.word ? 1 : 0;

@@ -8,6 +8,10 @@
 //   2. The screen around the button changes (new text appears, or most of the
 //      old text disappears). Needs no extra permission: the area is re-read
 //      with the computer's own text recognition about once a second.
+//   3. In a guide: the Enter key in a text box, and for a list box (Month,
+//      Gender) a click on the box followed by the next click (the choice).
+//      Only "Enter was pressed" is noticed; no other key is looked at, kept
+//      or sent, so what the person types is never recorded.
 // Watching stops after the first signal, a new question, or three minutes.
 
 const { screen, systemPreferences } = require("electron");
@@ -25,15 +29,31 @@ function ensureHook() {
   if (hookStarted) return true;
   if (!trusted()) return false;
   try {
-    hook = hook || require("uiohook-napi").uIOhook;
+    const lib = require("uiohook-napi");
+    hook = hook || lib.uIOhook;
+    const ENTER = new Set([lib.UiohookKey.Enter, lib.UiohookKey.NumpadEnter]);
     hook.on("mousedown", () => {
-      if (!current || !current.clicks) return;     // typing steps wait for the typed text instead
+      if (!current) return;
       const pt = screen.getCursorScreenPoint();
       const b = current.box, pad = 14;
-      if (pt.x >= b.x - pad && pt.x <= b.x + b.w + pad && pt.y >= b.y - pad && pt.y <= b.y + b.h + pad) {
+      const inBox = pt.x >= b.x - pad && pt.x <= b.x + b.w + pad && pt.y >= b.y - pad && pt.y <= b.y + b.h + pad;
+      if (current.pickClicks) {
+        // A list box: the click that opens it, then the click on a choice.
+        if (current.opened) current.choseAt = Date.now();
+        else if (inBox) current.opened = true;
+        return;
+      }
+      if (!current.clicks) return;                 // typing steps wait for the typed text instead
+      if (inBox) {
         const id = current.id;
         setTimeout(() => fire(id, "clicked"), 650);    // let the app react before the next look
       }
+    });
+    // Only whether the key was Enter is checked; nothing else about any key.
+    hook.on("keydown", (e) => {
+      if (!current || !ENTER.has(e.keycode)) return;
+      if (current.pickClicks && current.opened) { current.choseAt = Date.now(); return; }   // picked with the keyboard
+      if (current.enter) { const id = current.id; setTimeout(() => fire(id, "enter"), 120); }
     });
     hook.start();
     hookStarted = true;
@@ -78,7 +98,7 @@ const PICKS = {
 //       "value"          a list box: done when exactly one choice shows (the
 //                        list closed on a pick); an open list shows many
 // area: where to look for changes (defaults to the box), e.g. a page heading.
-async function watch(webContents, { id, box, area, clicks = true, mode = "any", exclude = [], pick = null }) {
+async function watch(webContents, { id, box, area, clicks = true, mode = "any", exclude = [], pick = null, enter = false, pickClicks = false }) {
   stop();
   const d = screen.getPrimaryDisplay().bounds;
   const a = area || box;
@@ -86,9 +106,10 @@ async function watch(webContents, { id, box, area, clicks = true, mode = "any", 
     x: Math.max(d.x, a.x - 420), y: Math.max(d.y, a.y - 80),
     w: Math.min(d.width, a.w + 840), h: Math.min(d.height, a.h + 560),
   };
-  const me = { id, box, region, clicks: clicks && mode === "any", mode, exclude, webContents, started: Date.now(), baseline: null, timer: null, pick: PICKS[pick] || null };
+  const me = { id, box, region, clicks: clicks && mode === "any", mode, exclude, webContents, started: Date.now(), baseline: null, timer: null, pick: PICKS[pick] || null, enter, pickClicks, opened: false, choseAt: 0 };
   current = me;
   const usingHook = ensureHook();
+  if (mode === "keys") return { ok: true, clicks: usingHook };      // Enter only, no screen reading
   // Two looks make the starting picture, so reading noise is not a "change".
   const first = await vision.readRegion(region, exclude);
   await new Promise((r) => setTimeout(r, 150));
@@ -112,6 +133,8 @@ async function poll(me) {
   const now = clean(res.lines);
   if (me.mode === "value" && me.pick) {
     const hits = [...now].filter((t) => me.pick.test(t));
+    // A choice was clicked and the list has closed (at most one choice shows).
+    if (me.choseAt && Date.now() - me.choseAt > 700 && hits.length <= 1) return fire(me.id, "typed");
     if (hits.length !== 1) { me.pending = null; return; }
     if (me.pending === "V" + hits[0]) return fire(me.id, "typed");   // same single choice on two looks
     me.pending = "V" + hits[0];

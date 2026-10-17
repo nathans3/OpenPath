@@ -252,7 +252,12 @@ export async function startOverlay(root) {
     }
   }
 
+  // A short line per guide event in the app's log (no screen text, nothing
+  // typed), so a stuck step can be traced.
+  const glog = (msg) => console.info("[guide] " + msg);
+
   async function showGuidePage(run, { page, head }, { quiet = false } = {}) {
+    glog("show page " + page.id);
     run.page = page; run.head = head; run.phase = 0; run.lastSeen = Date.now();
     run.steps = stepsOf(page); run.stepIndex = 0; run.skipOne = false;
     clearTimeout(run.stepTimer);
@@ -287,11 +292,19 @@ export async function startOverlay(root) {
     // Found the box the next step would point at (Google showed the Username
     // box straight away): skip that step instead of asking twice.
     run.skipOne = !!(f?.ok && step.skipNextIf && f.box.text === step.skipNextIf);
+    glog(`page ${page.id} step ${run.stepIndex + 1}/${run.steps.length} ${step.labels[0]}: ${f?.ok ? "found " + f.box.text : "not found"}`);
     const more = run.stepIndex < run.steps.length - 1;
     if (!more) { stopWatching(); return; }                    // the last box (Next): the page change moves on
-    if (step.after) run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
-    else if (f?.ok && native.readRegion && (step.field || (step.fieldIf && f.box.text === step.fieldIf))) watchField(run, page, step, f.box);
-    else if (f?.ok) watchGuide(run, f.box, step.pick ? "value" : "text-or-page", step.pick);
+    if (step.after) {
+      // Passwords show as dots, so: Enter, or a pause long enough to type it.
+      run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
+      if (f?.ok) watchGuide(run, f.box, "keys", null, { enter: true });
+    }
+    else if (f?.ok && native.readRegion && (step.field || (step.fieldIf && f.box.text === step.fieldIf))) {
+      watchField(run, page, step, f.box);                                  // the box holds a value
+      watchGuide(run, f.box, "keys", null, { enter: true });               // or Enter is pressed
+    }
+    else if (f?.ok) watchGuide(run, f.box, step.pick ? "value" : "text-or-page", step.pick, { pickClicks: !!step.pick });
     else run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) pointAtStep(run, page, near); }, 800);   // not on screen yet: look again
   }
 
@@ -355,19 +368,19 @@ export async function startOverlay(root) {
       if (guideRun !== run || run.page !== page || run.stepIndex !== idx || run.fieldToken !== token) return;
       if (v) {
         if (v !== last) { last = v; since = Date.now(); }
-        else if (Date.now() - since >= 1300) return advanceStep(run, page);
+        else if (Date.now() - since >= 1300) { glog("box filled: " + step.labels[0]); return advanceStep(run, page); }
       } else { last = null; }
       await new Promise((r) => setTimeout(r, 300));
     }
   }
 
-  function watchGuide(run, box, mode, pick) {
+  function watchGuide(run, box, mode, pick, { enter = false, pickClicks = false } = {}) {
     const id = ++watchId;
     watching = { id, out: { guide: true }, run };
     const area = run.head || box;
     setTimeout(() => {
       if (watching?.id !== id) return;
-      native.watchTarget({ id, mode, pick, clicks: false, exclude: overlayRects(),
+      native.watchTarget({ id, mode, pick, enter, pickClicks, clicks: false, exclude: overlayRects(),
         box: box ? { x: box.x, y: box.y, w: box.w, h: box.h } : { x: area.x, y: area.y, w: area.w, h: area.h },
         area: mode === "page" && run.head ? { x: run.head.x, y: run.head.y, w: run.head.w, h: run.head.h } : undefined,
       }).catch(() => {});
@@ -378,7 +391,21 @@ export async function startOverlay(root) {
     if (guideRun !== run) return;
     // A box was filled in: move to the next one. Page changes and menus are
     // picked up by guidePoll.
+    glog(`signal ${evt.reason} on page ${run.page?.id} step ${run.stepIndex + 1}`);
     if (evt.reason === "typed") return advanceStep(run, run.page);
+    if (evt.reason === "enter") {
+      // Enter in a Google box often works like Next. Give the page a moment:
+      // if it changed, follow the new page; otherwise go to the next box.
+      const page = run.page, idx = run.stepIndex;
+      setTimeout(async () => {
+        if (guideRun !== run || run.page !== page || run.stepIndex !== idx) return;
+        const hit = await detectPage(run);
+        if (guideRun !== run || run.page !== page || run.stepIndex !== idx) return;
+        if (hit && hit.page.id !== page.id) { stopWatching(); return showGuidePage(run, hit); }
+        advanceStep(run, page);
+      }, 700);
+      return;
+    }
     // "page": most words around the box changed. A real new page is picked up
     // by guidePoll; if the page is still the same (a list opened over the
     // boxes, an error message), keep watching the same box.
