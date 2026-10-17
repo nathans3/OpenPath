@@ -6,7 +6,7 @@
 const store = require("./store");
 
 async function transcribe({ audioBase64, mime, language, durationSec }, settings) {
-  if (settings.localOnly !== false) return { ok: false, reason: "local_only" };   // nothing leaves this computer
+  return { ok: false, reason: "local_only" };   // OpenPath listens on this computer only
   const apiKey = (settings.openaiKey || process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey) return { ok: false, reason: "no_key" };
 

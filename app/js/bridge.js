@@ -13,7 +13,7 @@ const WEB_DEFAULTS = {
   anthropicKey: "", openaiKey: "",
   qualityMode: "best", modelChoice: "", screenPictures: "ask",
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
-  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 10, setupPrice: 29 },
+  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 7.99, setupPrice: 29 },
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, sttSeconds: 0, cacheHitsLLM: 0 },
 };
 

@@ -168,7 +168,6 @@ export async function respond(rawQuery) {
 }
 
 async function notifyCaregiver(verdict, query, screen) {
-  if (state.settings.localOnly !== false && native.platform === "electron") return;   // nothing leaves this computer
   const url = (state.settings.caregiverWebhook || "").trim();
   if (!/^https:\/\//.test(url)) return;
   try {

@@ -1,4 +1,4 @@
-// Local only.
+// What OpenPath's windows may download.
 //
 // OpenPath's renderer windows reach the internet for exactly three kinds of
 // files, all parts of the app itself: the on-device speech models and voice
@@ -7,9 +7,9 @@
 // computer's OpenPath folder and served from disk from then on. No personal
 // data is sent in those requests.
 //
-// Every other web request from OpenPath's windows is blocked while
-// "Local only" is on (the default). The cloud AI services in the main
-// process (Claude, Whisper cloud) check the same switch.
+// The only other request the windows may make is the caregiver alert, to the
+// address the family set up. Everything else is blocked. Questions go to
+// Claude from the main process (services/anthropic.js), not from the windows.
 
 const { protocol, net, app } = require("electron");
 const { Readable } = require("stream");
@@ -56,8 +56,9 @@ function install(getSettings) {
       fs.renameSync(file + ".part", file);
       return serveFile(file);
     }
-    if (getSettings().localOnly !== false) return blocked("OpenPath is in local-only mode: nothing leaves this computer.");
-    return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    const hook = (getSettings().caregiverWebhook || "").trim();
+    if (hook && /^https:\/\//.test(hook) && req.url === hook) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    return blocked("OpenPath windows only download their own parts.");
   };
   protocol.handle("https", handler);
   protocol.handle("http", handler);
