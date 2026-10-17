@@ -15,6 +15,9 @@
 //                its first box, and each later box has its own "cue".
 //                "pick": the box is a list (Month, Gender); it counts as done
 //                when exactly one choice shows, i.e. the list closed on a pick.
+//                "field": a text box; done when it holds something other than
+//                its own label and that has not changed for 2 seconds (works
+//                for typing, autofill, and text typed before OpenPath looked).
 // textIf         a different first line when the first box found is that label
 // The guide moves on when the page changes, not when Next is clicked, so a
 // Google error ("That username is taken") keeps the person on the same step.
@@ -93,8 +96,8 @@ export const GUIDES = {
         detect: ["Enter your name", "Create a Google Account"],
         // Box by box: the pointer moves on when the box shows what was typed.
         target: { steps: [
-          { labels: ["First name"] },
-          { labels: ["Last name (optional)", "Last name"], cue: {
+          { labels: ["First name"], field: true },
+          { labels: ["Last name (optional)", "Last name"], field: true, cue: {
             en: "Good. Now click the Last name box and type your last name. If you'd rather not, just click Next.",
             es: "Bien. Ahora haga clic en el cuadro Last name y escriba su apellido. Si prefiere no hacerlo, haga clic en Next.",
             zh: "很好。现在点 Last name 框，输入您的姓。如果不想填，直接点 Next。",
@@ -113,12 +116,12 @@ export const GUIDES = {
         detect: ["Enter your birthday and gender", "Basic information"],
         target: { steps: [
           { labels: ["Month"], pick: "month" },
-          { labels: ["Day"], cue: {
+          { labels: ["Day"], field: true, cue: {
             en: "Good. Now click the Day box and type the day you were born.",
             es: "Bien. Ahora haga clic en el cuadro Day y escriba el día en que nació.",
             zh: "很好。现在点 Day 框，输入您出生的日期。",
             hi: "बहुत अच्छे। अब Day वाले खाने पर क्लिक करके अपने जन्म की तारीख लिखिए।" } },
-          { labels: ["Year"], cue: {
+          { labels: ["Year"], field: true, cue: {
             en: "Good. Now click the Year box and type the year you were born, all four numbers.",
             es: "Bien. Ahora haga clic en el cuadro Year y escriba el año en que nació, los cuatro números.",
             zh: "很好。现在点 Year 框，输入您出生的年份，四位数字。",
@@ -146,8 +149,8 @@ export const GUIDES = {
         // choice; others show the Username box straight away (then the second
         // step is skipped).
         target: { steps: [
-          { labels: ["Create your own Gmail address", "Create your own", "Username"], skipNextIf: "Username" },
-          { labels: ["Username"], cue: {
+          { labels: ["Create your own Gmail address", "Create your own", "Username"], skipNextIf: "Username", fieldIf: "Username" },
+          { labels: ["Username"], field: true, cue: {
             en: "Good. Now type the name you want in the Username box. Use letters and numbers, no spaces.",
             es: "Bien. Ahora escriba el nombre que quiera en el cuadro Username. Use letras y números, sin espacios.",
             zh: "很好。现在在 Username 框里输入您想要的名字。用字母和数字，不要空格。",
@@ -208,7 +211,7 @@ export const GUIDES = {
       {
         id: "phone",
         detect: ["Confirm you're not a robot", "Get a verification code", "Verify your phone number", "Add phone number"],
-        target: { steps: [{ labels: ["Phone number"] }, { labels: ["Next", "Yes, I'm in"], cue: {
+        target: { steps: [{ labels: ["Phone number"], field: true }, { labels: ["Next", "Yes, I'm in"], cue: {
           en: "Good. Now click Next. Google will text you a short code.",
           es: "Bien. Ahora haga clic en Next. Google le enviará un código corto por mensaje.",
           zh: "很好。现在点 Next。谷歌会给您发一条短信验证码。",
@@ -223,7 +226,7 @@ export const GUIDES = {
       {
         id: "code",
         detect: ["Enter the code", "Enter code", "verification code"],
-        target: { steps: [{ labels: ["Enter code", "Code"] }, { labels: ["Next", "Verify"], cue: "next" }] },
+        target: { steps: [{ labels: ["Enter code", "Code"], field: true }, { labels: ["Next", "Verify"], cue: "next" }] },
         text: {
           en: "Look at your phone for a text message from Google with a code, like G dash and 6 numbers. Click the box and type just the 6 numbers. Never tell this code to anyone who calls you.",
           es: "Busque en su teléfono un mensaje de Google con un código, como G guion y 6 números. Haga clic en el cuadro y escriba solo los 6 números. Nunca le dé este código a nadie que la llame.",

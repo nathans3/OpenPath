@@ -125,7 +125,7 @@ export function mountCircle(root, handlers) {
   // ---- quick menu on hover ----
   let quickTimer = null;
   const showQuick = () => { clearTimeout(quickTimer); if (drag?.moved) return; place(); quickLabels(); quick.classList.add("open"); circle.classList.add("is-hover"); };
-  const hideQuick = () => { clearTimeout(quickTimer); quickTimer = setTimeout(() => { quick.classList.remove("open"); circle.classList.remove("is-hover"); }, 180); };
+  const hideQuick = () => { clearTimeout(quickTimer); quickTimer = setTimeout(() => { quick.classList.remove("open"); circle.classList.remove("is-hover"); }, 70); };
   for (const n of [circle, quick]) { n.addEventListener("pointerenter", showQuick); n.addEventListener("pointerleave", hideQuick); }
   circle.addEventListener("focus", showQuick);
   quick.addEventListener("focusin", showQuick);

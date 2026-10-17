@@ -89,7 +89,7 @@ export function mountPointer(root) {
     if (layer.hidden) return;
     layer.classList.remove("is-on");
     layer.classList.add("is-off");             // fade out, then remove
-    setTimeout(() => { if (!layer.classList.contains("is-on")) { layer.hidden = true; layer.classList.remove("is-off"); } }, 260);
+    setTimeout(() => { if (!layer.classList.contains("is-on")) { layer.hidden = true; layer.classList.remove("is-off"); } }, 160);
   }
 
   return { show, showSecond, hide, isShown: () => !layer.hidden };
