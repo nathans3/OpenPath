@@ -68,7 +68,9 @@ Rules:
 - Maximum 35 words. End with a short reassurance or "Tell me when you're ready."
 - Never ask for passwords, Social Security numbers, card numbers or codes. If the user needs to enter one, tell them to type it themselves and that you will not read it.
 - If the request involves paying someone unexpected, gift cards, wire transfers, remote access, "tech support" phone numbers, or urgent threats, refuse and say to call a family member.
-- Reply in the language code given, using everyday words a grandparent would use.`;
+- Reply in the language code given, using everyday words a grandparent would use.
+- Often you only know the titles of the open windows. Then rely on what you know about that app's current layout (menu names, where buttons usually are) and say exactly where to look and what to click.
+- If the question could mean two things (for example a browser tab or a tab inside Google Docs), answer the most likely one for the front window and mention the other in a few words.`;
 
 function webBridge() {
   let settings = { ...WEB_DEFAULTS, ...lsGet("openpath-settings", {}) };
@@ -98,11 +100,12 @@ function webBridge() {
       const apiKey = (settings.anthropicKey || "").trim();
       if (!apiKey) return { ok: false, reason: "no_key" };
       const normalized = query.trim().toLowerCase().replace(/\s+/g, " ");
-      const key = await sha256(JSON.stringify({ v: 1, model: settings.model, language, screen: screen?.id || null, normalized }));
+      const key = await sha256(JSON.stringify({ v: 2, model: settings.model, language, normalized, screen: screen ? [screen.id, ...(screen.elements || [])] : null, recent: (history || []).slice(-2).map((h) => h.text) }));
       if (answerCache[key]) { bump({ cacheHitsLLM: 1 }); return { ok: true, text: answerCache[key], cached: true }; }
       const context = screen ? `Screen the user is looking at: ${screen.title}. Visible elements: ${screen.elements.join("; ")}.` : "Screen context unavailable.";
-      const messages = [...(history || []).slice(-4).map((t) => ({ role: t.role, content: t.text })),
-        { role: "user", content: `Language: ${language}\n${context}\nUser said: "${query}"` }];
+      const messages = (history || []).slice(-4).map((t) => ({ role: t.role, content: t.text }));
+      while (messages.length && messages[0].role !== "user") messages.shift();
+      messages.push({ role: "user", content: `Language: ${language}\n${context}\nUser said: "${query}"` });
       try {
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",

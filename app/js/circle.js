@@ -26,6 +26,7 @@ export function mountCircle(root, handlers) {
       <button class="op-btn primary act-next" type="button"></button>
       <button class="op-btn act-repeat" type="button"></button>
       <button class="op-btn ghost act-type" type="button"></button>
+      <button class="op-btn primary act-key" type="button" hidden></button>
     </div>
     <form class="op-type" hidden><input type="text" id="op-typed" autocomplete="off"><button class="op-btn primary" type="submit"></button></form>
     <div class="op-source"></div>`;
@@ -34,7 +35,7 @@ export function mountCircle(root, handlers) {
 
   const q = (s) => card.querySelector(s);
   const statusTxt = q(".op-status .txt"), you = q(".op-you"), reply = q(".op-reply"), step = q(".op-step"), source = q(".op-source");
-  const btnNext = q(".act-next"), btnRepeat = q(".act-repeat"), btnType = q(".act-type"), form = q(".op-type"), input = q("#op-typed"), btnSend = form.querySelector("button");
+  const btnNext = q(".act-next"), btnRepeat = q(".act-repeat"), btnType = q(".act-type"), btnKey = q(".act-key"), form = q(".op-type"), input = q("#op-typed"), btnSend = form.querySelector("button");
 
   // ---- position & drag ----
   // `pos` is only set once the person drags the circle; until then it follows
@@ -87,6 +88,7 @@ export function mountCircle(root, handlers) {
   q(".menu").addEventListener("click", handlers.onMenu);
   btnNext.addEventListener("click", () => handlers.onText(t(lang(), "done")));
   btnRepeat.addEventListener("click", handlers.onRepeat);
+  btnKey.addEventListener("click", () => handlers.onAddKey && handlers.onAddKey());
   btnType.addEventListener("click", () => { form.hidden = !form.hidden; if (!form.hidden) input.focus(); place(); });
   form.addEventListener("submit", (e) => { e.preventDefault(); const v = input.value.trim(); if (!v) return; input.value = ""; handlers.onText(v); });
 
@@ -95,6 +97,7 @@ export function mountCircle(root, handlers) {
     btnNext.textContent = t(L, "done");
     btnRepeat.textContent = t(L, "repeat");
     btnType.textContent = t(L, "typeInstead");
+    btnKey.textContent = t(L, "addKey");
     btnSend.textContent = t(L, "send");
     input.placeholder = t(L, "typePlaceholder");
   }
@@ -118,8 +121,9 @@ export function mountCircle(root, handlers) {
       you.innerHTML = text ? `${t(L, "youSaid")}: <b>${escapeHtml(text)}</b>${partial ? " …" : ""}` : "";
       place();
     },
-    setReply(text, { stepInfo, src } = {}) {
+    setReply(text, { stepInfo, src, needsKey } = {}) {
       reply.textContent = text || "";
+      btnKey.hidden = !needsKey;
       step.textContent = stepInfo && stepInfo.total > 1 ? `${t(lang(), "nextStep")} ${stepInfo.index + 1} / ${stepInfo.total}` : "";
       btnNext.hidden = !(stepInfo && stepInfo.total > 1 && !stepInfo.last);
       btnRepeat.hidden = !text;

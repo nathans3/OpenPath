@@ -32,12 +32,15 @@ async function liveScreen() {
     if (ctx?.reason === "permission") logEvent({ type: "warn", title: "Can't see your windows yet", detail: "Allow OpenPath under System Settings → Privacy & Security → Screen Recording, then reopen OpenPath." });
     return { id: "live", live: true, title: "the person's real screen", elements: ["Window names are not available (permission not granted)"], windows: [] };
   }
+  // Windows arrive front to back, so windows[0] is what the person is using.
   const windows = ctx.windows.map((w) => friendlyTitle(redact(w).text)).filter(Boolean);
   const risky = scoreText(windows.join(" \n "));
   const screen = {
     id: "live", live: true,
     title: "the person's real screen",
-    elements: windows.length ? windows.map((w) => `Open window: ${w}`) : ["No other windows are open"],
+    elements: windows.length
+      ? windows.map((w, i) => (i === 0 ? `Front window (what they are using now): ${w}` : `Also open: ${w}`))
+      : ["No other windows are open"],
     windows,
   };
   if (risky.score >= 5) {
@@ -97,15 +100,20 @@ export async function respond(rawQuery) {
   }
 
   // ---- 5. Claude ----
-  const res = await native.instruct({ query, language: lang, screen, history: state.history.slice(-4) });
+  // History sent to Claude: earlier turns only (the current question is sent
+  // separately), with the visible window titles as screen context.
+  const history = state.history.slice(-5, -1);
+  const res = await native.instruct({ query, language: lang, screen, history });
   if (res.ok) {
     active = null;
     logEvent({ type: "cost", title: res.cached ? "Answer served from cache" : "Claude answered", detail: res.cached ? "0 tokens" : `${res.usage?.input_tokens || 0} in / ${res.usage?.output_tokens || 0} out tokens` });
     return { text: res.text, source: res.cached ? "cache" : "claude" };
   }
-  if (res.reason === "bad_key") logEvent({ type: "warn", title: "Anthropic key rejected", detail: "Check the key in Settings → Keys" });
+  if (res.reason === "no_key") logEvent({ type: "warn", title: "No Claude key yet", detail: "Built-in guides only. Add a key in Settings → Keys to answer any question." });
+  if (res.reason === "bad_key") logEvent({ type: "warn", title: "Claude key rejected", detail: "Check the key in Settings → Keys" });
   if (res.reason === "rate_limited") logEvent({ type: "warn", title: "Claude is busy", detail: "Using built-in answers for now" });
   if (res.reason === "offline") logEvent({ type: "warn", title: "No internet", detail: "Using built-in answers" });
+  if (res.reason === "error") logEvent({ type: "warn", title: "Claude request failed", detail: res.detail || "Unknown error" });
 
   // ---- 6. fallback ----
   const found = findWorkflow(query, "en", screen);   // last try: English matching
@@ -114,7 +122,8 @@ export async function respond(rawQuery) {
     active = step.last ? null : { found, index: 0, lang, screenId: screen?.id || null };
     return { text: step.text, source: "offline", step };
   }
-  return { text: fallbackText(lang, screen), source: "offline" };
+  const reason = res.reason === "offline" ? "offline" : res.reason === "no_key" || res.reason === "bad_key" ? "no_key" : null;
+  return { text: fallbackText(lang, screen, { reason, query }), source: "offline", needsKey: reason === "no_key" };
 }
 
 async function notifyCaregiver(verdict, query, screen) {

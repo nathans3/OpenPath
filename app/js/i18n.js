@@ -12,6 +12,9 @@ export const LANGUAGES = [
 
 const STRINGS = {
   en: {
+    transcribing: "Writing down what you said…",
+    gettingReady: "Getting ready to listen ({p})…",
+    addKey: "Add Claude key",
     tapToTalk: "Tap to talk",
     listening: "I'm listening…",
     thinking: "One moment…",
@@ -49,6 +52,9 @@ const STRINGS = {
     cachedNote: "Answer reused from cache (no cost).",
   },
   es: {
+    transcribing: "Anotando lo que dijo…",
+    gettingReady: "Preparándome para escuchar ({p})…",
+    addKey: "Poner clave de Claude",
     tapToTalk: "Toque para hablar",
     listening: "Le escucho…",
     thinking: "Un momento…",
@@ -86,6 +92,9 @@ const STRINGS = {
     cachedNote: "Respuesta reutilizada de la caché (sin costo).",
   },
   zh: {
+    transcribing: "正在记下您说的话…",
+    gettingReady: "正在准备听您说话（{p}）…",
+    addKey: "添加 Claude 密钥",
     tapToTalk: "点一下，开始说话",
     listening: "我在听…",
     thinking: "请稍等…",
@@ -123,6 +132,9 @@ const STRINGS = {
     cachedNote: "回答来自缓存（无费用）。",
   },
   hi: {
+    transcribing: "आपकी बात लिख रही हूँ…",
+    gettingReady: "सुनने की तैयारी हो रही है ({p})…",
+    addKey: "Claude कुंजी जोड़ें",
     tapToTalk: "बोलने के लिए छुएँ",
     listening: "मैं सुन रही हूँ…",
     thinking: "एक पल रुकिए…",

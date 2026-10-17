@@ -5,7 +5,7 @@ import { t } from "./i18n.js";
 import { mountCircle } from "./circle.js";
 import { mountSidebar } from "./sidebar.js";
 import { respond, resetWorkflow } from "./engine.js";
-import { listen, speak, stopSpeaking, detectSttMode, persistUsage, warmKokoro } from "./speech.js";
+import { listen, speak, stopSpeaking, detectSttMode, persistUsage, warmKokoro, warmLocalWhisper } from "./speech.js";
 
 export async function startOverlay(root) {
   await loadSettings();
@@ -17,6 +17,8 @@ export async function startOverlay(root) {
   if (isDesktop || host === "localhost" || host === "127.0.0.1" || host.endsWith("github.io")) {
     if ((state.settings.ttsProvider || "auto") !== "system") setTimeout(() => warmKokoro(), 1500);
   }
+  // Load the on-device speech model at startup so the first tap is instant.
+  if (state.sttMode === "local") setTimeout(() => warmLocalWhisper(), 500);
 
   const lockBar = document.createElement("div");
   lockBar.id = "op-lock"; lockBar.hidden = true;
@@ -30,6 +32,7 @@ export async function startOverlay(root) {
     onMenu: () => sidebar.toggle(),
     onText: (text) => handleQuery(text, "typed"),
     onRepeat: () => { if (lastReply) say(lastReply.text); },
+    onAddKey: () => sidebar.open("keys"),
   });
   const sidebar = mountSidebar(root);
 
@@ -69,7 +72,10 @@ export async function startOverlay(root) {
     const result = await listen({
       onLevel: (v) => circle.setLevel(v),
       onPartial: (txt) => circle.setTranscript(txt, true),
-      onStatus: (s) => { if (s.startsWith("loading")) circle.setReply(`Getting ready to hear you (${s.replace("loading model ", "")})…`); },
+      onStatus: (s) => {
+        if (s.startsWith("loading")) circle.setReply(t(lang(), "gettingReady", { p: s.replace("loading model ", "") }));
+        else if (s === "transcribing") { setStatus("thinking"); circle.setStatus("thinking"); circle.setReply(t(lang(), "transcribing")); }
+      },
       shouldStop: () => stopRequested,
     });
     circle.setLevel(0);
@@ -111,7 +117,7 @@ export async function startOverlay(root) {
       await say(out.text, { keepLocked: true });
       return;
     }
-    circle.setReply(out.text, { stepInfo: out.step, src: out.source });
+    circle.setReply(out.text, { stepInfo: out.step, src: out.source, needsKey: out.needsKey });
     await say(out.text);
     persistUsage();
   }

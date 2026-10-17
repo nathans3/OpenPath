@@ -110,7 +110,8 @@ export function mountSidebar(root) {
 
     keys: () => `
       <p class="op-help">OpenPath works with no keys at all, using built-in answers and your computer's own voices. Add keys to unlock Claude answers for any question, the warm ElevenLabs voice, or cloud Whisper. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
-      <div class="op-field"><label for="op-k-anthropic">Anthropic API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off"></div>
+      <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off">
+        <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys. <button type="button" class="op-btn ghost" id="op-get-key" style="min-height:36px;padding:4px 10px;font-size:14px">Open the key page</button></p></div>
       <div class="op-field"><label for="op-model">Claude model</label>
         <select id="op-model">
           <option value="claude-haiku-5-5" ${s().model === "claude-haiku-5-5" ? "selected" : ""}>Claude Haiku 5.5 — fast and lightweight (default)</option>
@@ -194,6 +195,7 @@ export function mountSidebar(root) {
     });
     $("#op-sample")?.addEventListener("click", () => speak(t(L(), "sample")));
     $("#op-lab")?.addEventListener("click", () => native.openLab());
+    $("#op-get-key")?.addEventListener("click", () => native.openExternal("https://console.anthropic.com/settings/keys"));
     $("#op-screen-perm")?.addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
     $("#op-warm")?.addEventListener("click", async () => {
       const st = $("#op-warm-status"); st.textContent = "Downloading…";
