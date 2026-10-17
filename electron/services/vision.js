@@ -253,7 +253,9 @@ async function readRegion(region, exclude) {
   const r = { x: Math.max(0, region.x), y: Math.max(0, region.y) };
   r.w = Math.min(region.w, d.width - r.x); r.h = Math.min(region.h, d.height - r.y);
   if (r.w >= 20 && r.h >= 20) {
-    const m = await helperRead({ labels: [], fast: true, scale: 1, rect: r });
+    // Detailed reading at full resolution: small text (a menu, a typed name)
+    // must not be missed.
+    const m = await helperRead({ labels: [], fast: false, scale: 2, rect: r });
     if (m) return { ok: true, lines: m.map((x) => x.text.trim()).filter(Boolean) };
   }
   let file = null;
