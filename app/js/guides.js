@@ -22,14 +22,14 @@ export const GUIDES = {
     },
     // OpenPath never opens or clicks anything; it tells and points.
     start: {
-      en: "Let's make your Google account together. First, open your web browser. Click the address bar at the very top, type google dot com, and press Return. I'll watch and help from there.",
-      es: "Vamos a crear su cuenta de Google juntos. Primero, abra su navegador de internet. Haga clic en la barra de direcciones de arriba, escriba google punto com y pulse Intro. Yo la acompaño desde ahí.",
+      en: "Let's make your Google account together. First, open your web browser. Click the address bar at the very top, type google.com, and press Return. I'll watch and help from there.",
+      es: "Vamos a crear su cuenta de Google juntos. Primero, abra su navegador de internet. Haga clic en la barra de direcciones de arriba, escriba google.com y pulse Intro. Yo la acompaño desde ahí.",
       zh: "我们一起来注册谷歌账号。先打开您的网页浏览器。点最上面的地址栏，输入 google.com，然后按回车。之后我会一直帮您。",
       hi: "चलिए साथ मिलकर आपका Google अकाउंट बनाते हैं। पहले अपना वेब ब्राउज़र खोलिए। सबसे ऊपर पते वाली पट्टी पर क्लिक कीजिए, google.com लिखिए और Return दबाइए। उसके बाद मैं साथ-साथ मदद करूँगी।",
     },
     wrongPage: {
-      en: "That doesn't look like a Google sign-up page. Click the back arrow at the top left of your browser to go back. Or click the address bar, type google dot com, and press Return.",
-      es: "Esa no parece una página de registro de Google. Haga clic en la flecha hacia atrás, arriba a la izquierda del navegador, para regresar. O haga clic en la barra de direcciones, escriba google punto com y pulse Intro.",
+      en: "That doesn't look like a Google sign-up page. Click the back arrow at the top left of your browser to go back. Or click the address bar, type google.com, and press Return.",
+      es: "Esa no parece una página de registro de Google. Haga clic en la flecha hacia atrás, arriba a la izquierda del navegador, para regresar. O haga clic en la barra de direcciones, escriba google.com y pulse Intro.",
       zh: "这看起来不是谷歌的注册页面。点浏览器左上角的返回箭头回去。或者点地址栏，输入 google.com，然后按回车。",
       hi: "यह Google का साइन-अप पेज नहीं लग रहा। वापस जाने के लिए ब्राउज़र के ऊपर बाएँ कोने में पीछे वाले तीर पर क्लिक कीजिए। या पते वाली पट्टी पर क्लिक करके google.com लिखिए और Return दबाइए।",
     },
