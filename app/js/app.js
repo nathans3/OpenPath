@@ -5,7 +5,7 @@ import { t } from "./i18n.js";
 import { mountCircle } from "./circle.js";
 import { mountSidebar } from "./sidebar.js";
 import { mountPointer } from "./pointer.js";
-import { detectWords, bestPage, say as sayIn } from "./guides.js";
+import { detectWords, bestPage, stepsOf, say as sayIn } from "./guides.js";
 import { reveal, conceal, visibleArea, overlayRects } from "./motion.js";
 import { respond, resetWorkflow, nextStep } from "./engine.js";
 import { listen, speak, stopSpeaking, detectSttMode, persistUsage, warmKokoro, warmLocalWhisper } from "./speech.js";
@@ -171,6 +171,20 @@ export async function startOverlay(root) {
   let guideRun = null;
   const isRepeatAsk = (q) => /again|repeat|what did you say|otra vez|repita|再说|重复|फिर से|दोबारा/i.test(q);
 
+  // Labels the browser's Back arrow and address bar (reading only).
+  async function pointAtBrowser(run, { back }) {
+    if (!native.browserParts) return;
+    const parts = await native.browserParts();
+    if (guideRun !== run || !parts?.ok) return;
+    const L = lang();
+    if (back && parts.back) {
+      pointer.show({ ...parts.back, tag: t(L, "backArrow") }, circle.center());
+      if (parts.address) pointer.showSecond(parts.address, t(L, "addressBar"));
+    } else if (parts.address) {
+      pointer.show({ ...parts.address, tag: t(L, "addressBar") }, circle.center());
+    }
+  }
+
   async function detectPage(run) {
     const res = await native.findAll(detectWords(run.guide), overlayRects());
     if (!res?.ok || !res.found.length) return null;
@@ -192,6 +206,7 @@ export async function startOverlay(root) {
     circle.setReply(text, { src: "offline" });
     state.history.push({ role: "assistant", text, at: Date.now() });
     say(text);
+    pointAtBrowser(run, { back: false });
     waitForPage(run, null);
   }
 
@@ -212,6 +227,7 @@ export async function startOverlay(root) {
           pointer.hide();
           circle.show(); circle.setReply(text, { src: "offline" });
           say(text);
+          pointAtBrowser(run, { back: true });
         }
       }
       await new Promise((r) => setTimeout(r, 300));
@@ -230,17 +246,33 @@ export async function startOverlay(root) {
       say(text);                                  // speak while the pointer is found
     } else { setStatus("idle"); circle.setStatus("idle"); }
     if (page.done) { guideRun = null; return; }
-    let box = null;
-    if (page.target) {
-      const near = head ? { x: head.x + head.w / 2, y: head.y + head.h + 120 } : null;
-      const f = await native.locate(page.target.labels, near, overlayRects());
-      if (guideRun !== run) return;
-      if (f?.ok) { box = f.box; pointer.show(box, circle.center()); state.lastPoint = centerOf(box); }
-    }
-    if (box) circle.keepClear(box);                     // the answer box never covers what to click
-    // Typing watch: only to move the pointer to Next after the person types.
-    if (page.target?.then && box) watchGuide(run, box, "text-or-page");
+    run.steps = stepsOf(page); run.stepIndex = 0;
+    if (run.steps.length) await pointAtStep(run, page, head ? { x: head.x + head.w / 2, y: head.y + head.h + 120 } : null);
     guidePoll(run, page);
+  }
+
+  // Points at the current box of the page and watches for it to be filled in.
+  async function pointAtStep(run, page, near) {
+    const step = run.steps[run.stepIndex];
+    const f = await native.locate(step.labels, near || state.lastPoint, overlayRects());
+    if (guideRun !== run || run.page !== page) return;
+    clearTimeout(run.stepTimer);
+    if (f?.ok) { pointer.show(f.box, state.lastPoint || circle.center()); state.lastPoint = centerOf(f.box); circle.keepClear(f.box); }
+    const more = run.stepIndex < run.steps.length - 1;
+    if (!more) { stopWatching(); return; }                    // the last box (Next): the page change moves on
+    if (step.after) run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
+    else if (f?.ok) watchGuide(run, f.box, "text-or-page");
+  }
+
+  async function advanceStep(run, page) {
+    if (guideRun !== run || run.page !== page || run.stepIndex >= run.steps.length - 1) return;
+    stopWatching();
+    run.stepIndex++;
+    const step = run.steps[run.stepIndex];
+    const cue = step.cue === "next" ? t(lang(), "nowNext") : step.cue ? sayIn(step.cue, lang()) : null;
+    circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
+    if (cue) { circle.setReply(cue, { src: "offline" }); say(cue); }
+    await pointAtStep(run, page, state.lastPoint);
   }
 
   // While a page is showing, look at the whole screen about once a second for
@@ -276,19 +308,9 @@ export async function startOverlay(root) {
 
   async function guideFollow(run, evt) {
     if (guideRun !== run) return;
-    if (evt.reason === "typed" && run.phase === 0 && run.page?.target?.then) {
-      // They typed: move the pointer to Next and watch for the page to change.
-      run.phase = 1;
-      const near = state.lastPoint;
-      const f = await native.locate(run.page.target.then, near, overlayRects());
-      if (guideRun !== run) return;
-      if (f?.ok) { pointer.show(f.box, near); state.lastPoint = centerOf(f.box); }
-      if (f?.ok) circle.keepClear(f.box);
-      circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
-      say(t(lang(), "nowNext"));
-      return;
-    }
-    // Page changes and menus are picked up by guidePoll.
+    // A box was filled in: move to the next one. Page changes and menus are
+    // picked up by guidePoll.
+    if (evt.reason === "typed") advanceStep(run, run.page);
   }
 
   // The person pressed the button (or the screen changed around it): give the

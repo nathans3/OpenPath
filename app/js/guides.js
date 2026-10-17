@@ -7,8 +7,10 @@
 // reads the screen (on this computer), finds which page is showing, and
 // gives that page's instructions.
 //
-// target.labels  words on the page to point at first (usually the first box)
-// target.then    where the pointer moves once the person has typed (usually "Next")
+// target.labels  words on the page to point at
+// target.steps   several boxes in order: the pointer moves to the next one once
+//                the box shows what was typed or picked ("after": move on after
+//                that many ms instead, for passwords); "cue" is said at each move
 // The guide moves on when the page changes, not when Next is clicked, so a
 // Google error ("That username is taken") keeps the person on the same step.
 
@@ -84,7 +86,16 @@ export const GUIDES = {
       {
         id: "name",
         detect: ["Enter your name", "Create a Google Account"],
-        target: { labels: ["First name"], then: ["Next"] },
+        // Box by box: the pointer moves on when the box shows what was typed.
+        target: { steps: [
+          { labels: ["First name"] },
+          { labels: ["Last name (optional)", "Last name"], cue: {
+            en: "Good. Now type your last name in the box below, or leave it empty.",
+            es: "Bien. Ahora escriba su apellido en el cuadro de abajo, o déjelo en blanco.",
+            zh: "很好。现在在下面的框里输入您的姓，也可以不填。",
+            hi: "बहुत अच्छे। अब नीचे वाले खाने में अपना उपनाम लिखिए, या उसे खाली छोड़ दीजिए।" } },
+          { labels: ["Next"], cue: "next" },
+        ] },
         text: {
           en: "This is Google's sign-up page. Click the box that says First name and type your first name. You can type your last name in the box below it. Then click the blue Next button.",
           es: "Esta es la página de registro de Google. Haga clic en el cuadro que dice First name y escriba su nombre. Puede escribir su apellido en el cuadro de abajo. Luego haga clic en el botón azul Next.",
@@ -95,7 +106,25 @@ export const GUIDES = {
       {
         id: "birthday",
         detect: ["Enter your birthday and gender", "Basic information"],
-        target: { labels: ["Month"] },
+        target: { steps: [
+          { labels: ["Month"] },
+          { labels: ["Day"], cue: {
+            en: "Good. Now type the day you were born in the Day box.",
+            es: "Bien. Ahora escriba el día en que nació en el cuadro Day.",
+            zh: "很好。现在在 Day 框里输入您出生的日期。",
+            hi: "बहुत अच्छे। अब Day वाले खाने में अपने जन्म की तारीख लिखिए।" } },
+          { labels: ["Year"], cue: {
+            en: "Now type the year you were born, all four numbers, in the Year box.",
+            es: "Ahora escriba el año en que nació, los cuatro números, en el cuadro Year.",
+            zh: "现在在 Year 框里输入您出生的年份，四位数字。",
+            hi: "अब Year वाले खाने में अपने जन्म का साल लिखिए, चारों अंक।" } },
+          { labels: ["Gender"], cue: {
+            en: "Now click Gender and pick one. You can choose Rather not say.",
+            es: "Ahora haga clic en Gender y elija una opción. Puede elegir Rather not say.",
+            zh: "现在点 Gender，选一个。也可以选 Rather not say。",
+            hi: "अब Gender पर क्लिक करके एक चुनिए। आप Rather not say भी चुन सकते हैं।" } },
+          { labels: ["Next"], cue: "next" },
+        ] },
         text: {
           en: "Now your birthday. Click the box that says Month and pick your birth month. Then type the day and the year in the boxes next to it. Below that, choose your gender. Then click Next.",
           es: "Ahora su fecha de nacimiento. Haga clic en el cuadro Month y elija el mes. Luego escriba el día y el año en los cuadros de al lado. Debajo, elija su género. Luego haga clic en Next.",
@@ -117,7 +146,17 @@ export const GUIDES = {
       {
         id: "password",
         detect: ["Create a strong password"],
-        target: { labels: ["Password"] },
+        // Typed passwords show as dots, which cannot be read, so the pointer
+        // moves on after a pause instead (the spoken step covers everything).
+        target: { steps: [
+          { labels: ["Password"], after: 14000 },
+          { labels: ["Confirm"], after: 12000, cue: {
+            en: "Now type the same password again in the Confirm box.",
+            es: "Ahora escriba la misma contraseña otra vez en el cuadro Confirm.",
+            zh: "现在在 Confirm 框里再输入一遍同样的密码。",
+            hi: "अब वही पासवर्ड Confirm वाले खाने में दोबारा लिखिए।" } },
+          { labels: ["Next"], cue: "next" },
+        ] },
         text: {
           en: "Now make up a password: at least 8 letters, numbers and symbols. Type it in the Password box, then type the same password again in the Confirm box. Write it on paper and keep it somewhere safe. I won't read it. Then click Next.",
           es: "Ahora invente una contraseña: al menos 8 letras, números y símbolos. Escríbala en el cuadro Password y luego escríbala igual en el cuadro Confirm. Anótela en un papel y guárdela en un lugar seguro. Yo no la leeré. Luego haga clic en Next.",
@@ -139,7 +178,7 @@ export const GUIDES = {
       {
         id: "phone",
         detect: ["Confirm you're not a robot", "Get a verification code", "Verify your phone number", "Add phone number"],
-        target: { labels: ["Phone number"], then: ["Next", "Yes, I'm in"] },
+        target: { steps: [{ labels: ["Phone number"] }, { labels: ["Next", "Yes, I'm in"], cue: "next" }] },
         text: {
           en: "Google wants your mobile phone number to keep your account safe. Click the Phone number box and type your number. Then click Next. Google will text you a short code.",
           es: "Google pide su número de celular para proteger su cuenta. Haga clic en el cuadro Phone number y escriba su número. Luego haga clic en Next. Google le enviará un código corto por mensaje.",
@@ -150,7 +189,7 @@ export const GUIDES = {
       {
         id: "code",
         detect: ["Enter the code", "Enter code", "verification code"],
-        target: { labels: ["Enter code", "Code"], then: ["Next", "Verify"] },
+        target: { steps: [{ labels: ["Enter code", "Code"] }, { labels: ["Next", "Verify"], cue: "next" }] },
         text: {
           en: "Look at your phone for a text message from Google with a code, like G dash and 6 numbers. Type just the 6 numbers in the box, then click Next. Never tell this code to anyone who calls you.",
           es: "Busque en su teléfono un mensaje de Google con un código, como G guion y 6 números. Escriba solo los 6 números en el cuadro y haga clic en Next. Nunca le dé este código a nadie que la llame.",
@@ -240,7 +279,17 @@ export function allGuideLines(lang) {
   const out = [];
   for (const g of Object.values(GUIDES)) {
     for (const d of [g.start, g.wrongPage]) out.push(say(d, lang));
-    for (const p of g.pages) out.push(say(p.text, lang));
+    for (const p of g.pages) {
+      out.push(say(p.text, lang));
+      for (const st of p.target?.steps || []) if (st.cue && st.cue !== "next") out.push(say(st.cue, lang));
+    }
   }
   return out;
+}
+
+// The boxes of a page in order, whichever way the page describes them.
+export function stepsOf(page) {
+  if (!page.target) return [];
+  if (page.target.steps) return page.target.steps;
+  return [{ labels: page.target.labels }];
 }
