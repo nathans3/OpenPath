@@ -208,7 +208,7 @@ body.op-overlay-body { overflow: hidden; font-family: var(--font-body); color: v
 }
 .op-pointer-layer.is-on .op-ring { opacity: 1; transform: scale(1); animation: op-ring-pulse 1.4s ease-in-out 1s infinite; }
 @keyframes op-ring-pulse { 0%,100% { box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 22px 4px var(--point-glow), inset 0 0 0 2px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 40px 14px var(--point-glow), inset 0 0 0 2px rgba(255,255,255,0.6); } }
-.op-cursor { position: absolute; left: 0; top: 0; transition: transform .7s cubic-bezier(.3,.7,.2,1); filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
+.op-cursor { position: absolute; left: 0; top: 0; transition: transform .4s cubic-bezier(.3,.7,.2,1); filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
 .op-cursor path { fill: var(--point); stroke: var(--point-ink); stroke-width: 2.2; stroke-linejoin: round; }
 .op-tag {
   position: absolute; padding: 8px 14px; border-radius: 999px; background: var(--point); color: var(--point-ink);
@@ -225,7 +225,7 @@ body.op-overlay-body { overflow: hidden; font-family: var(--font-body); color: v
 .op-card .op-status .close-card { font-size: 20px; }
 
 /* ---------------- Quick menu under the circle ---------------- */
-#op-root > .op-quick { position: absolute; display: grid; gap: 6px; width: 140px; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .14s ease, transform .14s ease; }
+#op-root > .op-quick { position: absolute; display: grid; gap: 6px; width: 140px; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .1s ease, transform .1s ease; }
 #op-root > .op-quick.above { transform: translateY(6px); }
 #op-root > .op-quick.open { opacity: 1; transform: none; pointer-events: auto; }
 .op-qbtn { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 14px; font-weight: 700; box-shadow: 0 6px 18px rgba(0,0,0,.22); text-align: left; }
@@ -256,7 +256,7 @@ body.op-overlay-body { overflow: hidden; font-family: var(--font-body); color: v
 @keyframes op-text { from { opacity: 0; } to { opacity: 1; } }
 .op-choices > * { animation: op-in .22s cubic-bezier(.2,.8,.2,1) both; }
 .op-card { transition: left .25s cubic-bezier(.2,.8,.2,1), top .25s cubic-bezier(.2,.8,.2,1); }
-.op-pointer-layer.is-off .op-ring, .op-pointer-layer.is-off .op-tag, .op-pointer-layer.is-off .op-cursor { opacity: 0; transition: opacity .22s ease; animation: none; }
+.op-pointer-layer.is-off .op-ring, .op-pointer-layer.is-off .op-tag, .op-pointer-layer.is-off .op-cursor { opacity: 0; transition: opacity .14s ease; animation: none; }
 #op-sidebar { top: var(--vis-top, 0px); bottom: var(--vis-bottom-gap, 0px); transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .25s ease; opacity: 0; }
 #op-sidebar.open { opacity: 1; }
 #op-sidebar:not(.open) { pointer-events: none; }

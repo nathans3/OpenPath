@@ -290,13 +290,15 @@ export async function startOverlay(root) {
     const more = run.stepIndex < run.steps.length - 1;
     if (!more) { stopWatching(); return; }                    // the last box (Next): the page change moves on
     if (step.after) run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
+    else if (f?.ok && native.readRegion && (step.field || (step.fieldIf && f.box.text === step.fieldIf))) watchField(run, page, step, f.box);
     else if (f?.ok) watchGuide(run, f.box, step.pick ? "value" : "text-or-page", step.pick);
-    else run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) pointAtStep(run, page, near); }, 1500);   // not on screen yet: look again
+    else run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) pointAtStep(run, page, near); }, 800);   // not on screen yet: look again
   }
 
   async function advanceStep(run, page) {
     if (guideRun !== run || run.page !== page || run.stepIndex >= run.steps.length - 1) return;
     stopWatching();
+    pointer.hide();                                // the done box loses its ring at once
     run.stepIndex = Math.min(run.steps.length - 1, run.stepIndex + (run.skipOne ? 2 : 1));
     run.skipOne = false;
     const step = run.steps[run.stepIndex];
@@ -313,7 +315,7 @@ export async function startOverlay(root) {
     const token = (run.pollToken = (run.pollToken || 0) + 1);
     let misses = 0;
     while (guideRun === run && run.page === page && run.pollToken === token) {
-      await new Promise((r) => setTimeout(r, 700));
+      await new Promise((r) => setTimeout(r, 450));
       if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
       const hit = await detectPage(run);
       if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
@@ -330,6 +332,35 @@ export async function startOverlay(root) {
     }
   }
 
+  // What a text box holds, read from the box itself: its lines minus its own
+  // label (which floats above the text once something is typed). "" = empty.
+  const normLine = (x) => x.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim();
+  async function fieldValue(step, box) {
+    const r = { x: box.x - 12, y: box.y - 8, w: Math.max(box.w + 120, 150), h: box.h + 36 };
+    const res = await native.readRegion(r).catch(() => null);
+    if (!res?.ok) return null;
+    const labels = step.labels.map(normLine);
+    return res.lines.map(normLine)
+      .filter((x) => x && !/^gmail ?com$/.test(x) && !labels.some((l) => l.includes(x) || x.includes(l)))
+      .join(" ");
+  }
+
+  // Moves on once the box holds something and it has stayed the same for 2 s
+  // (the person finished typing, or the browser filled it in for them).
+  async function watchField(run, page, step, box) {
+    const idx = run.stepIndex, token = (run.fieldToken = (run.fieldToken || 0) + 1);
+    let last = null, since = 0;
+    while (guideRun === run && run.page === page && run.stepIndex === idx && run.fieldToken === token) {
+      const v = await fieldValue(step, box);
+      if (guideRun !== run || run.page !== page || run.stepIndex !== idx || run.fieldToken !== token) return;
+      if (v) {
+        if (v !== last) { last = v; since = Date.now(); }
+        else if (Date.now() - since >= 1300) return advanceStep(run, page);
+      } else { last = null; }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
   function watchGuide(run, box, mode, pick) {
     const id = ++watchId;
     watching = { id, out: { guide: true }, run };
@@ -340,7 +371,7 @@ export async function startOverlay(root) {
         box: box ? { x: box.x, y: box.y, w: box.w, h: box.h } : { x: area.x, y: area.y, w: area.w, h: area.h },
         area: mode === "page" && run.head ? { x: run.head.x, y: run.head.y, w: run.head.w, h: run.head.h } : undefined,
       }).catch(() => {});
-    }, 300);
+    }, 150);
   }
 
   async function guideFollow(run, evt) {
@@ -352,7 +383,7 @@ export async function startOverlay(root) {
     // by guidePoll; if the page is still the same (a list opened over the
     // boxes, an error message), keep watching the same box.
     const page = run.page, idx = run.stepIndex;
-    setTimeout(() => { if (guideRun === run && run.page === page && run.stepIndex === idx) pointAtStep(run, page, state.lastPoint); }, 1500);
+    setTimeout(() => { if (guideRun === run && run.page === page && run.stepIndex === idx) pointAtStep(run, page, state.lastPoint); }, 800);
   }
 
   // The person pressed the button (or the screen changed around it): give the
