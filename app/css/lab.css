@@ -43,6 +43,15 @@ body.lab-body { background: var(--lab-bg); color: var(--lab-ink); font-family: v
 .lab-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--lab-ink); color: var(--lab-bg); padding: 12px 18px; border-radius: 12px; font-size: 15px; box-shadow: 0 10px 30px rgba(0,0,0,.3); z-index: 50; }
 .lab-toast[hidden] { display: none; }
 
+/* real screen */
+.lab-nav button.real small { color: var(--lab-accent); }
+.lab-nav button.real[aria-current="true"] small { color: #d6f4ff; }
+.lab-real { max-width: 620px; background: var(--lab-rail); border: 1px solid var(--lab-line); border-radius: 18px; padding: 24px 26px; display: grid; gap: 12px; font-size: 17px; line-height: 1.5; }
+.lab-real h2 { margin: 0; font-family: var(--lab-display); font-size: 24px; text-wrap: balance; }
+.lab-real p { margin: 0; color: var(--lab-ink-2); }
+.lab-real .muted { font-size: 15px; color: var(--lab-ink-3); }
+.lab-real-btn { justify-self: start; min-height: 46px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--lab-line); background: transparent; color: var(--lab-ink); font-weight: 700; }
+
 /* desktop */
 .lab-desktop { position: relative; min-height: 560px; border-radius: 18px; background: linear-gradient(160deg, #8fbcd4, #3b6e8f 55%, #1d3b52); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
 .lab-menubar { display: flex; gap: 18px; padding: 6px 14px; background: rgba(255,255,255,.75); color: #222; font-size: 13px; font-weight: 700; }

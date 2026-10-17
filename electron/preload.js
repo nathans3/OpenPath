@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("openpathNative", {
   labSay: (text) => ipcRenderer.send("lab:say", text),
   publishEvent: (evt) => ipcRenderer.send("overlay:event", evt),
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
+  screenContext: () => ipcRenderer.invoke("screen:context"),
+  requestScreenPermission: () => ipcRenderer.invoke("screen:permission"),
   info: () => ipcRenderer.invoke("app:info"),
 
   onScreen: (cb) => ipcRenderer.on("lab:screen", (_e, s) => cb(s)),

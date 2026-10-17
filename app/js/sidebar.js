@@ -70,6 +70,9 @@ export function mountSidebar(root) {
           <option value="calm" ${s().voiceStyle === "calm" ? "selected" : ""}>Calm</option>
           <option value="male" ${s().voiceStyle === "male" ? "selected" : ""}>Male</option>
         </select></div>
+      ${isDesktop ? `<div class="op-field"><span class="lbl">Screen awareness</span>
+        <p class="op-help">When no practice screen is picked, OpenPath reads the names of your open windows each time you ask, so it knows what you are looking at. No screenshots. On a Mac this needs the Screen Recording permission.</p>
+        <button type="button" class="op-btn ghost" id="op-screen-perm" style="justify-self:start">Open Screen Recording settings</button></div>` : ""}
       <div class="op-row"><button class="op-btn primary" type="button" id="op-sample">▶ ${t(lang, "hearSample")}</button><button class="op-btn" type="button" id="op-lab">${t(lang, "testLab")}</button></div>`,
 
     family: (lang) => `
@@ -191,6 +194,7 @@ export function mountSidebar(root) {
     });
     $("#op-sample")?.addEventListener("click", () => speak(t(L(), "sample")));
     $("#op-lab")?.addEventListener("click", () => native.openLab());
+    $("#op-screen-perm")?.addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
     $("#op-warm")?.addEventListener("click", async () => {
       const st = $("#op-warm-status"); st.textContent = "Downloading…";
       const p = await warmLocalWhisper((pct) => { st.textContent = `Downloading ${pct}%`; });

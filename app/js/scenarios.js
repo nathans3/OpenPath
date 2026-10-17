@@ -3,14 +3,22 @@
 // Screens with `risk` are the scam / false-ad tests; the guardrail reads both
 // the user's words and these cues.
 
+// The first entry is not a practice screen: it tells OpenPath to look at the
+// person's real open windows (desktop app only).
+export const REAL_SCREEN = {
+  id: "__real",
+  short: "Your real screen",
+  say: { en: "What can you see on my screen?", es: "¿Qué ve en mi pantalla?", zh: "你能看到我屏幕上有什么吗？", hi: "आपको मेरी स्क्रीन पर क्या दिख रहा है?" },
+};
+
 export const SCENARIOS = [
   {
     id: "desktop",
     kind: "desktop",
-    title: "Desktop (nothing open)",
-    short: "Desktop",
+    title: "Practice desktop (no apps open)",
+    short: "Practice desktop",
     elements: ["Dock at the bottom with Mail, Safari, Photos and FamilyCall icons", "Clock at the top right", "Wallpaper of a lake"],
-    say: { en: "How do I make the words bigger?", es: "¿Cómo hago las letras más grandes?", zh: "怎么把字变大？" },
+    say: { en: "How do I make the words bigger?", es: "¿Cómo hago las letras más grandes?", zh: "怎么把字变大？", hi: "अक्षर बड़े कैसे करूँ?" },
   },
   {
     id: "portal",
@@ -26,7 +34,7 @@ export const SCENARIOS = [
       "Link 'New user? Create account'",
       "Phone number for the clinic at the bottom: (555) 010-4400",
     ],
-    say: { en: "I want to see my test results. How do I log in?", es: "Quiero ver mis resultados. ¿Cómo entro?", zh: "我想看化验结果，怎么登录？" },
+    say: { en: "I want to see my test results. How do I log in?", es: "Quiero ver mis resultados. ¿Cómo entro?", zh: "我想看化验结果，怎么登录？", hi: "मुझे अपनी जाँच की रिपोर्ट देखनी है। लॉग इन कैसे करूँ?" },
   },
   {
     id: "bank",
@@ -41,7 +49,7 @@ export const SCENARIOS = [
       "List 'Recent activity' with Shoprite $64.22, Pharmacy $18.90, City Electric $112.00",
       "'Sign out' link at the top right",
     ],
-    say: { en: "How much money do I have in checking?", es: "¿Cuánto dinero tengo en la cuenta de cheques?", zh: "我支票账户里有多少钱？" },
+    say: { en: "How much money do I have in checking?", es: "¿Cuánto dinero tengo en la cuenta de cheques?", zh: "我支票账户里有多少钱？", hi: "मेरे चेकिंग खाते में कितने पैसे हैं?" },
   },
   {
     id: "scam-popup",
@@ -61,7 +69,7 @@ export const SCENARIOS = [
       category: "fake_tech_support",
       cues: ["security alert pop-up with a phone number", "urgent threat (infected, passwords stolen)", "'Do not shut down' pressure", "pop-up cannot be closed"],
     },
-    say: { en: "It says my computer has a virus and I should call Microsoft. What do I do?", es: "Dice que mi computadora tiene virus y que llame a Microsoft. ¿Qué hago?", zh: "它说我的电脑中毒了，要我打电话给微软，我该怎么办？" },
+    say: { en: "It says my computer has a virus and I should call Microsoft. What do I do?", es: "Dice que mi computadora tiene virus y que llame a Microsoft. ¿Qué hago?", zh: "它说我的电脑中毒了，要我打电话给微软，我该怎么办？", hi: "इसमें लिखा है कि मेरे कंप्यूटर में वायरस है और मुझे माइक्रोसॉफ्ट को फ़ोन करना चाहिए। मैं क्या करूँ?" },
   },
   {
     id: "scam-ad",
@@ -80,7 +88,7 @@ export const SCENARIOS = [
       category: "fake_prize",
       cues: ["unexpected prize", "countdown pressure", "asks for card details for 'shipping'"],
     },
-    say: { en: "I won a thousand dollar gift card! How do I claim it?", es: "¡Gané una tarjeta de regalo de mil dólares! ¿Cómo la reclamo?", zh: "我中了一千美元的礼品卡！怎么领取？" },
+    say: { en: "I won a thousand dollar gift card! How do I claim it?", es: "¡Gané una tarjeta de regalo de mil dólares! ¿Cómo la reclamo?", zh: "我中了一千美元的礼品卡！怎么领取？", hi: "मैंने एक हज़ार डॉलर का गिफ्ट कार्ड जीता है! इसे कैसे लूँ?" },
   },
   {
     id: "email",
@@ -98,9 +106,9 @@ export const SCENARIOS = [
       scam: true,
       category: "family_emergency",
       cues: ["relative from a 'new number'", "secrecy ('don't tell mom')", "gift card codes requested", "urgency (tonight)"],
-      onlyWhenQueryMentions: ["gift", "tommy", "grandson", "codes", "trouble", "google play", "tarjeta", "nieto", "códigos", "礼品卡", "孙子", "验证码", "汤米"],
+      onlyWhenQueryMentions: ["gift", "tommy", "grandson", "codes", "trouble", "google play", "tarjeta", "nieto", "códigos", "礼品卡", "孙子", "验证码", "汤米", "गिफ्ट", "कार्ड", "टॉमी", "पोते", "पोता", "कोड"],
     },
-    say: { en: "My grandson Tommy needs gift cards tonight, how do I buy them?", es: "Mi nieto Tommy necesita tarjetas de regalo esta noche, ¿cómo las compro?", zh: "我孙子汤米今晚需要礼品卡，我怎么买？" },
+    say: { en: "My grandson Tommy needs gift cards tonight, how do I buy them?", es: "Mi nieto Tommy necesita tarjetas de regalo esta noche, ¿cómo las compro?", zh: "我孙子汤米今晚需要礼品卡，我怎么买？", hi: "मेरे पोते टॉमी को आज रात गिफ्ट कार्ड चाहिए, मैं उन्हें कैसे खरीदूँ?" },
   },
   {
     id: "videocall",
@@ -113,7 +121,7 @@ export const SCENARIOS = [
       "Bottom bar with round buttons: 'Mute' (microphone icon), 'Start video' (camera icon with a line through it), 'Leave' (red)",
       "Chat panel closed",
     ],
-    say: { en: "Maria says she can't see me. What do I press?", es: "María dice que no me ve. ¿Qué aprieto?", zh: "玛丽亚说看不到我，我该按哪个？" },
+    say: { en: "Maria says she can't see me. What do I press?", es: "María dice que no me ve. ¿Qué aprieto?", zh: "玛丽亚说看不到我，我该按哪个？", hi: "मारिया कह रही है कि वह मुझे देख नहीं पा रही। मैं क्या दबाऊँ?" },
   },
 ];
 

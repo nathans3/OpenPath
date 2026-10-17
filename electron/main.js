@@ -3,7 +3,7 @@
 // (so the floating circle and sidebar sit above every other app), plus a
 // normal "Test Lab" window that shows realistic practice screens.
 
-const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, desktopCapturer, systemPreferences } = require("electron");
 const path = require("path");
 
 const store = require("./services/store");
@@ -131,6 +131,28 @@ ipcMain.on("overlay:event", (_e, evt) => {
 });
 ipcMain.handle("app:openExternal", (_e, url) => {
   if (/^https:\/\//.test(url)) shell.openExternal(url);
+});
+
+// Real screen awareness: the titles of the windows that are open right now.
+// Titles only. No screenshots are taken and nothing is captured in the
+// background; this runs once per question, after the person taps the circle.
+ipcMain.handle("screen:context", async () => {
+  try {
+    const status = process.platform === "darwin" ? systemPreferences.getMediaAccessStatus("screen") : "granted";
+    // On macOS the first getSources call is what makes the OS offer the
+    // Screen Recording permission, so we call it even when not yet granted.
+    const sources = await desktopCapturer.getSources({ types: ["window"], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+    const windows = sources.map((s) => (s.name || "").trim())
+      .filter((n) => n && n !== "OpenPath" && n !== "OpenPath Test Lab" && !/^(Window Server|Dock|Menubar|Notification Center|Control Center|Spotlight|Wallpaper)$/i.test(n));
+    if (status !== "granted" && windows.length === 0) return { ok: false, reason: "permission", status };
+    return { ok: true, windows: [...new Set(windows)].slice(0, 12), status };
+  } catch (err) {
+    return { ok: false, reason: "error", detail: String(err?.message || err) };
+  }
+});
+ipcMain.handle("screen:permission", () => {
+  if (process.platform === "darwin") shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+  return true;
 });
 ipcMain.handle("app:info", () => ({
   platform: process.platform,

@@ -2,8 +2,10 @@
 // medical portal, a bank, a fake virus pop-up, a prize ad, a scam email and a
 // video call. Buttons on each screen either behave like the real thing or
 // feed a phrase to the assistant exactly as if the person had said it.
-import { native } from "./bridge.js";
-import { SCENARIOS, scenarioById, screenState } from "./scenarios.js";
+import { native, isDesktop } from "./bridge.js";
+import { SCENARIOS, REAL_SCREEN, scenarioById, screenState } from "./scenarios.js";
+
+const SAY_LANGS = [["en", "English"], ["es", "Español"], ["zh", "中文"], ["hi", "हिन्दी"]];
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -114,8 +116,11 @@ export function mountLab(root, { embedded = false } = {}) {
   root.innerHTML = `
     <aside class="lab-rail">
       <div class="lab-brand"><span class="orb"></span><div><b>OpenPath</b><small>Test Lab</small></div></div>
-      <p class="lab-intro">Pick a practice screen. Then tap the glowing circle and speak, or press <b>Say it for me</b> to hear a typical request.</p>
-      <nav class="lab-nav">${SCENARIOS.map((s) => `<button type="button" data-sc="${s.id}" class="${s.risk ? "risky" : ""}">${esc(s.short)}${s.risk ? `<small>scam test</small>` : ""}</button>`).join("")}</nav>
+      <p class="lab-intro">${isDesktop ? "OpenPath starts out looking at <b>your real screen</b>. Pick a practice screen to try a scenario." : "Pick a practice screen."} Then tap the glowing circle and speak, or press <b>Say it for me</b> to hear a typical request.</p>
+      <nav class="lab-nav">
+        ${isDesktop ? `<button type="button" data-sc="${REAL_SCREEN.id}" class="real">${esc(REAL_SCREEN.short)}<small>live</small></button>` : ""}
+        ${SCENARIOS.map((s) => `<button type="button" data-sc="${s.id}" class="${s.risk ? "risky" : ""}">${esc(s.short)}${s.risk ? `<small>scam test</small>` : ""}</button>`).join("")}
+      </nav>
       <div class="lab-say">
         <div class="lbl">Say it for me</div>
         <div class="lab-say-btns" id="lab-say-btns"></div>
@@ -131,12 +136,25 @@ export function mountLab(root, { embedded = false } = {}) {
   let current = null;
 
   function show(id) {
-    const sc = scenarioById(id); if (!sc) return;
+    const sc = id === REAL_SCREEN.id ? REAL_SCREEN : scenarioById(id); if (!sc) return;
     current = sc;
     root.querySelectorAll("[data-sc]").forEach((b) => b.setAttribute("aria-current", b.dataset.sc === id));
+    sayBtns.innerHTML = SAY_LANGS.map(([l, n]) => `<button type="button" data-say-lang="${l}" title="${esc(sc.say[l])}"><b>${n}</b><span>${esc(sc.say[l])}</span></button>`).join("");
+    if (sc === REAL_SCREEN) {
+      stage.className = "lab-stage kind-real";
+      stage.innerHTML = `
+        <div class="lab-real">
+          <h2>OpenPath is looking at your real screen</h2>
+          <p>Switch to any app or website you have open, then tap the glowing circle and ask for help. OpenPath reads the <b>names</b> of your open windows, nothing else, and only after you tap.</p>
+          <p class="muted">On a Mac, the first time you ask, macOS may ask to allow OpenPath under <b>Screen Recording</b>. That permission is what lets it read window names. No screenshots are taken.</p>
+          <button type="button" class="lab-real-btn" id="lab-perm">Open Screen Recording settings</button>
+        </div>`;
+      stage.querySelector("#lab-perm").addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
+      native.publishScreen(null);
+      return;
+    }
     stage.innerHTML = SCREENS[sc.kind]();
     stage.className = "lab-stage kind-" + sc.kind;
-    sayBtns.innerHTML = [["en", "English"], ["es", "Español"], ["zh", "中文"]].map(([l, n]) => `<button type="button" data-say-lang="${l}" title="${esc(sc.say[l])}"><b>${n}</b><span>${esc(sc.say[l])}</span></button>`).join("");
     native.publishScreen(screenState(sc));
     wireStage();
   }
@@ -181,6 +199,6 @@ export function mountLab(root, { embedded = false } = {}) {
   let toastTimer = null;
   function toast(msg) { const el = root.querySelector("#lab-toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2600); }
 
-  show(embedded ? "portal" : "desktop");
+  show(isDesktop ? REAL_SCREEN.id : "portal");
   return { show };
 }

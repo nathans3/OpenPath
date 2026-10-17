@@ -183,6 +183,8 @@ function webBridge() {
     labSay(text) { emit("lab:say", text); },
     publishEvent(evt) { emit("overlay:event", evt); },
     async openExternal(url) { if (/^https:\/\//.test(url)) window.open(url, "_blank", "noopener"); },
+    async screenContext() { return { ok: false, reason: "web" }; },   // a browser page cannot see other windows
+    async requestScreenPermission() { return false; },
     async info() { return { platform: "web", version: "0.1.0", userData: "browser storage" }; },
 
     onScreen: (cb) => on("lab:screen", cb),
