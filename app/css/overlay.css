@@ -261,3 +261,8 @@ body.op-overlay-body { overflow: hidden; font-family: var(--font-body); color: v
 #op-sidebar.open { opacity: 1; }
 #op-sidebar:not(.open) { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .op-enter, .op-leave, #op-lock.op-enter, #op-lock.op-leave { animation-duration: .01s !important; } .op-card { transition: none; } }
+
+/* Second pointer ("or here"): dashed, no glow animation. */
+.op-ring-2 { border-style: dashed; box-shadow: 0 0 0 3px rgba(0,0,0,0.2); animation: none !important; }
+.op-tag-2 { font-size: 16px; opacity: .95; }
+.op-ring-2[hidden], .op-tag-2[hidden] { display: none; }

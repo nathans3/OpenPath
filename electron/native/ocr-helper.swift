@@ -14,9 +14,10 @@ import Foundation
 import Vision
 import AppKit
 import ScreenCaptureKit
+import ApplicationServices
 
 struct Rect: Decodable { let x: Double; let y: Double; let w: Double; let h: Double }
-struct Request: Decodable { let file: String?; let labels: [String]; let fast: Bool?; let scale: Double?; let rect: Rect? }
+struct Request: Decodable { let cmd: String?; let file: String?; let labels: [String]?; let fast: Bool?; let scale: Double?; let rect: Rect? }
 
 func isWordChar(_ c: Character) -> Bool { c.isLetter || c.isNumber }
 
@@ -85,14 +86,62 @@ func read(_ cg: CGImage, labels: [String], fast: Bool) -> [[String: Any]] {
   return out
 }
 
+
+// ---------- Browser parts: where the Back button and the address bar are ----------
+// Reads the frontmost app's accessibility information (the same structure
+// screen readers use). Only reads positions; never presses anything. Needs the
+// Accessibility permission; without it, returns the app and window only.
+let browserBundles: Set<String> = ["com.apple.Safari", "com.google.Chrome", "com.brave.Browser", "com.microsoft.edgemac", "org.mozilla.firefox", "company.thebrowser.Browser", "com.operasoftware.Opera", "com.vivaldi.Vivaldi", "org.chromium.Chromium"]
+
+func attr(_ el: AXUIElement, _ name: String) -> AnyObject? {
+  var v: AnyObject?
+  return AXUIElementCopyAttributeValue(el, name as CFString, &v) == .success ? v : nil
+}
+func frame(_ el: AXUIElement) -> [String: Double]? {
+  guard let p = attr(el, kAXPositionAttribute), let z = attr(el, kAXSizeAttribute) else { return nil }
+  var pt = CGPoint.zero, sz = CGSize.zero
+  AXValueGetValue(p as! AXValue, .cgPoint, &pt); AXValueGetValue(z as! AXValue, .cgSize, &sz)
+  if sz.width < 4 || sz.height < 4 { return nil }
+  return ["x": Double(pt.x), "y": Double(pt.y), "w": Double(sz.width), "h": Double(sz.height)]
+}
+func str(_ el: AXUIElement, _ name: String) -> String { (attr(el, name) as? String ?? "").lowercased() }
+
+func browserParts() -> [String: Any] {
+  guard let app = NSWorkspace.shared.frontmostApplication else { return ["ok": false] }
+  let bundle = app.bundleIdentifier ?? ""
+  var out: [String: Any] = ["ok": true, "app": app.localizedName ?? "", "bundle": bundle, "isBrowser": browserBundles.contains(bundle), "trusted": AXIsProcessTrusted()]
+  // Window bounds without any permission.
+  if let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
+    for w in list where (w[kCGWindowOwnerPID as String] as? Int32) == app.processIdentifier && (w[kCGWindowLayer as String] as? Int) == 0 {
+      if let b = w[kCGWindowBounds as String] as? [String: Double] { out["window"] = ["x": b["X"] ?? 0, "y": b["Y"] ?? 0, "w": b["Width"] ?? 0, "h": b["Height"] ?? 0]; break }
+    }
+  }
+  guard AXIsProcessTrusted() else { return out }
+  let root = AXUIElementCreateApplication(app.processIdentifier)
+  let start: AXUIElement = (attr(root, kAXFocusedWindowAttribute) as! AXUIElement?) ?? root
+  var queue: [(AXUIElement, Int)] = [(start, 0)], seen = 0
+  while !queue.isEmpty && seen < 4000 {
+    let (el, depth) = queue.removeFirst(); seen += 1
+    let role = str(el, kAXRoleAttribute)
+    let label = [str(el, kAXDescriptionAttribute), str(el, kAXTitleAttribute), str(el, kAXHelpAttribute), str(el, "AXIdentifier")].joined(separator: " ")
+    if out["back"] == nil && role == "axbutton" && (label.hasPrefix("back") || label.contains(" back") || label.contains("go back")), let f = frame(el) { out["back"] = f }
+    if out["address"] == nil && (role == "axtextfield" || role == "axcombobox") && (label.contains("address") || label.contains("search") || label.contains("url") || label.contains("location")), let f = frame(el) { out["address"] = f }
+    if out["back"] != nil && out["address"] != nil { break }
+    if depth < 14, let kids = attr(el, kAXChildrenAttribute) as? [AXUIElement] { for k in kids { queue.append((k, depth + 1)) } }
+  }
+  return out
+}
+
 setvbuf(stdout, nil, _IOLBF, 0)
 while let line = readLine() {
   var answer: [String: Any] = ["ok": false]
-  if let data = line.data(using: .utf8), let req = try? JSONDecoder().decode(Request.self, from: data) {
+  if let data = line.data(using: .utf8), let req = try? JSONDecoder().decode(Request.self, from: data), req.cmd == "browser" {
+    answer = browserParts()
+  } else if let data = line.data(using: .utf8), let req = try? JSONDecoder().decode(Request.self, from: data) {
     var cg: CGImage? = nil
     if let f = req.file { cg = NSImage(contentsOfFile: f)?.cgImage(forProposedRect: nil, context: nil, hints: nil) }
     else { cg = capture(scale: req.scale ?? 2, rect: req.rect) }
-    if let img = cg { answer = ["ok": true, "matches": read(img, labels: req.labels, fast: req.fast ?? false)] }
+    if let img = cg { answer = ["ok": true, "matches": read(img, labels: req.labels ?? [], fast: req.fast ?? false)] }
     else { answer = ["ok": false, "reason": "capture_failed"] }
   }
   let json = (try? JSONSerialization.data(withJSONObject: answer)) ?? Data("{\"ok\":false}".utf8)

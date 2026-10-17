@@ -16,15 +16,36 @@ export function mountPointer(root) {
     <svg class="op-cursor" viewBox="0 0 32 40" width="44" height="55">
       <path d="M3 2 L3 32 L11 25 L16.5 37 L22 34.5 L16.5 23 L27 23 Z" />
     </svg>
-    <div class="op-tag"></div>`;
+    <div class="op-tag"></div>
+    <div class="op-ring op-ring-2" hidden></div>
+    <div class="op-tag op-tag-2" hidden></div>`;
   root.append(layer);
 
   const ring = layer.querySelector(".op-ring");
   const cursor = layer.querySelector(".op-cursor");
   const tag = layer.querySelector(".op-tag");
+  const ring2 = layer.querySelector(".op-ring-2");
+  const tag2 = layer.querySelector(".op-tag-2");
   let hideTimer = null;
 
+  // A second, quieter ring with its own label ("or here").
+  function showSecond(screenBox, label) {
+    if (!screenBox) { ring2.hidden = true; tag2.hidden = true; return; }
+    const v = visibleArea(), b = toClient(screenBox), pad = 8;
+    const w = Math.max(40, b.w + pad * 2), h = Math.max(32, b.h + pad * 2);
+    const x = Math.max(v.left + 2, Math.min(v.right - w - 2, b.x + b.w / 2 - w / 2));
+    const y = Math.max(v.top + 2, Math.min(v.bottom - h - 2, b.y + b.h / 2 - h / 2));
+    Object.assign(ring2.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
+    tag2.textContent = label; tag2.hidden = false; ring2.hidden = false;
+    tag2.style.left = "0px"; tag2.style.top = "0px";
+    const tw = tag2.offsetWidth || 160;
+    tag2.style.left = Math.max(v.left + 8, Math.min(v.right - tw - 8, x)) + "px";
+    tag2.style.top = Math.min(v.bottom - 40, y + h + 10) + "px";
+    layer.hidden = false; layer.classList.add("is-on");
+  }
+
   function show(screenBox, from) {
+    showSecond(null);
     const box = toClient(screenBox);
     const v = visibleArea();
     const pad = 10;
@@ -71,5 +92,5 @@ export function mountPointer(root) {
     setTimeout(() => { if (!layer.classList.contains("is-on")) { layer.hidden = true; layer.classList.remove("is-off"); } }, 260);
   }
 
-  return { show, hide, isShown: () => !layer.hidden };
+  return { show, showSecond, hide, isShown: () => !layer.hidden };
 }

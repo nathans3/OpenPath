@@ -12,6 +12,8 @@ export const LANGUAGES = [
 
 const STRINGS = {
   en: {
+    backArrow: "Back arrow",
+    addressBar: "Address bar: type google.com here",
     nowNext: "Good. Now click Next.",
     plusTag: "Click the + to the right",
     youClicked: "Got it ✓",
@@ -61,6 +63,8 @@ const STRINGS = {
     cachedNote: "Same answer as before.",
   },
   es: {
+    backArrow: "Flecha atrás",
+    addressBar: "Barra de direcciones: escriba google.com aquí",
     nowNext: "Bien. Ahora haga clic en Next.",
     plusTag: "Haga clic en el + de la derecha",
     youClicked: "Entendido ✓",
@@ -110,6 +114,8 @@ const STRINGS = {
     cachedNote: "La misma respuesta de antes.",
   },
   zh: {
+    backArrow: "返回箭头",
+    addressBar: "地址栏：在这里输入 google.com",
     nowNext: "很好。现在点 Next。",
     plusTag: "点右边的加号",
     youClicked: "好的 ✓",
@@ -159,6 +165,8 @@ const STRINGS = {
     cachedNote: "和之前的回答一样。",
   },
   hi: {
+    backArrow: "पीछे वाला तीर",
+    addressBar: "पते वाली पट्टी: यहाँ google.com लिखिए",
     nowNext: "बहुत अच्छे। अब Next पर क्लिक कीजिए।",
     plusTag: "दाईं ओर वाले + पर क्लिक कीजिए",
     youClicked: "ठीक है ✓",

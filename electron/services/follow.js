@@ -63,7 +63,8 @@ function similar(a, b) {
   return prev[n] / Math.max(m, n) <= 0.25;
 }
 const isNew = (line, set) => ![...set].some((b) => similar(line, b));
-const clean = (lines) => new Set(lines.filter((raw) => !isClock(raw)).map(normalize).filter((t) => t.length >= 3));
+// Short lines are usually stray marks, except numbers: a typed day ("12") counts.
+const clean = (lines) => new Set(lines.filter((raw) => !isClock(raw)).map(normalize).filter((t) => t.length >= 3 || /^\d+$/.test(t)));
 
 // mode: "any"  (default) a click in the ring, typing, or a page change
 //       "text-or-page"   typing or a page change, reported separately
@@ -104,7 +105,9 @@ async function poll(me) {
   const added = [...now].filter((t) => isNew(t, me.baseline));
   const gone = [...me.baseline].filter((t) => isNew(t, now)).length;
   const page = gone >= Math.max(3, me.baseline.size * 0.5);
-  const typed = !page && added.length >= 1;
+  // A dropdown list opening adds many lines at once (January … December):
+  // that is not an answer yet, so wait until it closes on a choice.
+  const typed = !page && added.length >= 1 && added.length <= 3;
   const changed = page || (typed && me.mode !== "page");
   // The change has to be there on two looks in a row.
   if (!changed) { me.pending = null; return; }

@@ -245,6 +245,36 @@ async function findAll(labels, exclude) {
   }
 }
 
+// Where the front browser's Back button and address bar are (screen points).
+// Uses the browser's accessibility information when OpenPath has the
+// Accessibility permission; otherwise finds the web address text at the top
+// of the browser window and estimates the Back button beside it.
+async function browserParts() {
+  if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
+  const info = await helperAsk({ cmd: "browser" });
+  if (!info?.ok || !info.isBrowser) return { ok: false, reason: "not_browser", app: info?.app };
+  const out = { ok: true, app: info.app, back: info.back || null, address: info.address || null, estimated: false };
+  if ((!out.back || !out.address) && info.window) {
+    // Without the Accessibility permission: browsers put the tab strip on top
+    // and the toolbar (Back, Forward, Reload, address bar) in the row below.
+    // Safari has a single row. Read only the toolbar row, so tab titles that
+    // look like web addresses are ignored.
+    const win = info.window, safari = /safari/i.test(info.app);
+    const row = safari ? { top: win.y + 4, bottom: win.y + 48 } : { top: win.y + 40, bottom: win.y + 86 };
+    const strip = { x: win.x, y: row.top, w: win.w, h: row.bottom - row.top };
+    const m = await helperRead({ labels: [], fast: false, scale: 2, rect: strip });
+    const urlish = /^(https?:\/\/)?(www\.)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i;
+    const lines = (m || []).map((x) => ({ text: x.text.trim(), x: strip.x + x.x * strip.w, y: strip.y + x.y * strip.h, w: x.w * strip.w, h: x.h * strip.h }));
+    const hit = lines.find((x) => urlish.test(x.text.replace(/\s/g, ""))) || lines.find((x) => /search|type a url|address/i.test(x.text));
+    const rowY = hit ? hit.y + hit.h / 2 : (row.top + row.bottom) / 2;
+    if (!out.address) out.address = hit
+      ? { x: hit.x - 44, y: rowY - 15, w: Math.min(hit.w + 64, win.w * 0.55), h: 30 }
+      : { x: win.x + (safari ? win.w * 0.3 : 268), y: rowY - 15, w: Math.min(560, win.w * 0.4), h: 30 };
+    if (!out.back) { out.back = { x: win.x + (safari ? 76 : 8), y: rowY - 14, w: 28, h: 28 }; out.estimated = true; }
+  }
+  return out;
+}
+
 // Every line of text inside `region` (screen points). Used to notice that the
 // screen changed after the person clicked (a menu opened, a tab appeared).
 async function readRegion(region, exclude) {
@@ -302,4 +332,4 @@ function cleanup() {
   if (helper) { try { helper.kill(); } catch { /* ignore */ } }
 }
 
-module.exports = { locate, findAll, readRegion, snapshotForClaude, isSensitive, cleanup };
+module.exports = { locate, findAll, browserParts, readRegion, snapshotForClaude, isSensitive, cleanup };

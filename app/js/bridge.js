@@ -215,6 +215,7 @@ function webBridge() {
     },
     async point() { return { ok: false, reason: "web" }; },
     async findAll() { return { ok: false, reason: "web" }; },
+    async browserParts() { return { ok: false, reason: "web" }; },
     // In the web preview the practice screen is on the same page, so a real
     // click inside the ring is easy to notice.
     async watchTarget({ id, box, clicks = true }) {
