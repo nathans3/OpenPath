@@ -41,11 +41,14 @@ export async function detectSttMode() {
 // build runs on the CPU.
 const whisperModel = () => (state.settings?.qualityMode === "low" ? "onnx-community/whisper-base" : "onnx-community/whisper-small");
 let localModelId = null;
+// Set after the graphics-chip version fails once (for example after the GPU
+// resets in a long session); from then on Whisper runs on the main processor.
+let whisperCpuOnly = false;
 
 async function loadLocalWhisper(onProgress) {
   const WHISPER_MODEL = whisperModel();
   if (localPipeline && localModelId === WHISPER_MODEL) return localPipeline;
-  if (localPipeline) { localPipeline = null; }
+  if (localPipeline) { try { localPipeline.dispose?.(); } catch { /* already gone */ } localPipeline = null; }
   if (localLoading) return localLoading;
   localLoading = (async () => {
     const mod = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3/dist/transformers.min.js");
@@ -53,7 +56,7 @@ async function loadLocalWhisper(onProgress) {
     env.allowLocalModels = false;
     const progress_callback = (ev) => { if (ev.status === "progress" && onProgress) onProgress(Math.round(ev.progress || 0)); };
     let p = null;
-    if (navigator.gpu) {
+    if (navigator.gpu && !whisperCpuOnly) {
       try {
         p = await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
           device: "webgpu", dtype: { encoder_model: "fp32", decoder_model_merged: "q4" }, progress_callback,
@@ -234,17 +237,39 @@ export async function listen({ onLevel, onStart, onPartial, onStatus, shouldStop
   }
 
   // local Whisper
+  return transcribeLocal(rec.pcm, rec.sampleRate, lang.code, onStatus);
+}
+
+// Turns a recording into words with Whisper on this computer. If the
+// graphics-chip version fails (most often the GPU dropped the model in a long
+// session), Whisper restarts on the main processor and tries the same
+// recording once more.
+export async function transcribeLocal(pcm, sampleRate, langCode, onStatus) {
+  const mode = "local";
   onStatus && onStatus("transcribing");
   try {
     const p = await loadLocalWhisper((pct) => onStatus && onStatus(`loading model ${pct}%`));
     onStatus && onStatus("transcribing");
-    const clean = prepareAudio(rec.pcm, rec.sampleRate);
+    const clean = prepareAudio(pcm, sampleRate);
     if (clean.seconds < 0.35) return { text: "", mode, reason: "silence" };
-    const out = await p(clean.pcm, { language: whisperLang(lang.code), task: "transcribe", chunk_length_s: 30, stride_length_s: 5 });
+    const opts = { language: whisperLang(langCode), task: "transcribe", chunk_length_s: 30, stride_length_s: 5 };
+    let out;
+    try { out = await p(clean.pcm, opts); }
+    catch (first) {
+      console.error("OpenPath: Whisper failed, retrying on the CPU", first);
+      logEvent({ type: "warn", title: "Speech model restarted", detail: String(first?.message || first).slice(0, 160) });
+      whisperCpuOnly = true;
+      if (localPipeline) { try { localPipeline.dispose?.(); } catch { /* already gone */ } }
+      localPipeline = null; localModelId = null;
+      const cpu = await loadLocalWhisper((pct) => onStatus && onStatus(`loading model ${pct}%`));
+      onStatus && onStatus("transcribing");
+      out = await cpu(clean.pcm, opts);
+    }
     const text = cleanTranscript(out?.text);
-    state.settings.usage.sttSeconds += Math.round(clean.seconds);
+    if (state.settings.usage) state.settings.usage.sttSeconds += Math.round(clean.seconds);
     return { text, mode, reason: text ? null : "silence" };
   } catch (e) {
+    console.error("OpenPath: Whisper failed", e);
     logEvent({ type: "warn", title: "Local Whisper failed", detail: String(e?.message || e) });
     return { text: "", mode, reason: "local_failed" };
   }

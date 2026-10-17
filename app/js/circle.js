@@ -217,6 +217,9 @@ export function mountCircle(root, handlers) {
     },
     setReply(text, { stepInfo, src, needsKey } = {}) {
       reply.textContent = text || "";
+      // A new instruction shows the box (if it had faded) and restarts its
+      // close-by-itself timer.
+      if (text) { if (!isShown(card)) api.show(); else armIdle(); }
       btnKey.hidden = !needsKey;
       card.querySelector(".op-choices").innerHTML = "";
       step.textContent = stepInfo && stepInfo.total > 1 ? `${t(lang(), "nextStep")} ${stepInfo.index + 1} / ${stepInfo.total}` : "";

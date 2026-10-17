@@ -45,6 +45,7 @@ const STRINGS = {
     lockCaregiverNone: "Call someone you trust before doing anything.",
     unlock: "I understand. Close this warning",
     noMic: "I can't use the microphone here, so type what you need.",
+    sttFailed: "I heard you, but I couldn't make out the words. Please tap and try again, or type it here.",
     didntCatch: "I didn't catch that. Tap the circle and try again, or type it.",
     settings: "Settings",
     tabVoice: "Voice", tabAccount: "Account", tabKeys: "Setup", tabHistory: "History", tabFamily: "Family", tabCosts: "Costs",
@@ -96,6 +97,7 @@ const STRINGS = {
     lockCaregiverNone: "Llame a alguien de confianza antes de hacer nada.",
     unlock: "Entiendo. Cerrar este aviso",
     noMic: "Aquí no puedo usar el micrófono; escriba lo que necesita.",
+    sttFailed: "La escuché, pero no entendí las palabras. Toque e inténtelo de nuevo, o escríbalo aquí.",
     didntCatch: "No le entendí. Toque el círculo y pruebe otra vez, o escríbalo.",
     settings: "Ajustes",
     tabVoice: "Voz", tabAccount: "Cuenta", tabKeys: "Configuración", tabHistory: "Historial", tabFamily: "Familia", tabCosts: "Costos",
@@ -147,6 +149,7 @@ const STRINGS = {
     lockCaregiverNone: "做任何事之前，先打电话给您信任的人。",
     unlock: "我明白了。关闭此警告",
     noMic: "这里无法使用麦克风，请打字告诉我。",
+    sttFailed: "我听到您说话了，但没听清楚。请再点一下重试，或者在这里打字。",
     didntCatch: "我没听清。请点一下圆圈再试一次，或者打字。",
     settings: "设置",
     tabVoice: "语音", tabAccount: "账户", tabKeys: "安装设置", tabHistory: "记录", tabFamily: "家人", tabCosts: "费用",
@@ -198,6 +201,7 @@ const STRINGS = {
     lockCaregiverNone: "कुछ भी करने से पहले किसी भरोसेमंद व्यक्ति को फ़ोन कीजिए।",
     unlock: "ठीक है, समझ आ गया। चेतावनी बंद करें",
     noMic: "यहाँ माइक्रोफ़ोन नहीं चल रहा, इसलिए लिखकर बताइए।",
+    sttFailed: "मैंने आपको सुना, पर शब्द समझ नहीं पाया। फिर से टैप करके बोलिए, या यहाँ लिखिए।",
     didntCatch: "मैं ठीक से सुन नहीं पाई। गोले को छूकर फिर से बोलिए, या लिख दीजिए।",
     settings: "सेटिंग्स",
     tabVoice: "आवाज़", tabAccount: "खाता", tabKeys: "सेटअप", tabHistory: "इतिहास", tabFamily: "परिवार", tabCosts: "खर्च",
@@ -232,5 +236,5 @@ export function hasFullUi(code) { return !!STRINGS[code]; }
 
 // Fixed interface sentences that are spoken aloud (for the voice pack).
 export function STRINGS_FOR_VOICE(lang) {
-  return ["sample", "didntCatch", "noMic", "consentPictures", "allDone", "nowNext"].map((k) => t(lang, k));
+  return ["sample", "didntCatch", "noMic", "sttFailed", "consentPictures", "allDone", "nowNext"].map((k) => t(lang, k));
 }
