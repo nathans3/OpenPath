@@ -11,10 +11,9 @@
 // Every microphone path has an energy-based silence detector so a person who
 // pauses to think is not cut off, and one who forgets to stop is.
 //
-// Speaking:
-//   elevenlabs — warm multilingual voice, cached by SHA-256 so a repeated
-//                sentence costs nothing the second time.
-//   system     — the operating system's own voices, no key, no cost.
+// Speaking (free, on this computer):
+//   kokoro — natural English voice that runs inside OpenPath on any computer.
+//   system — the computer's own voices, for Spanish, Chinese and Hindi.
 
 import { native, isDesktop } from "./bridge.js";
 import { state, saveSettings, logEvent } from "./bus.js";
@@ -256,18 +255,73 @@ function whisperLang(code) {
 }
 
 // ---------------- Speaking ----------------
-// Tiers: ElevenLabs (key) → Kokoro neural voice on this computer (free,
-// English, ~90 MB downloaded once) → the operating system's best voice.
+// Kokoro neural voice on this computer (free, ~90 MB downloaded once) for
+// English, Spanish and Hindi → the operating system's best voice.
 let currentAudio = null;
 let currentUtterance = null;
 
 let kokoro = null, kokoroLoading = null, kokoroFailed = false;
 const kokoroCache = new Map();           // sha256 → object URL, so repeats are instant
 const KOKORO_VOICE = { warm: "af_heart", calm: "af_bella", male: "am_michael" };
+// Spanish and Hindi use Kokoro's own Spanish and Hindi voices. Kokoro's built-in
+// pronunciation guide only knows English, so espeak-ng (free, ~18 MB, runs on
+// this computer) turns the words into sounds first. Chinese stays on the
+// computer's voice: Kokoro needs a separate Chinese reader for that.
+const KOKORO_LANG = {
+  es: { espeak: "es-419", voices: { warm: "ef_dora", calm: "ef_dora", male: "em_alex" } },
+  hi: { espeak: "hi", voices: { warm: "hf_alpha", calm: "hf_beta", male: "hm_omega" } },
+};
+let espeakModule = null;
+function loadEspeak() {
+  if (!espeakModule) {
+    espeakModule = import("https://cdn.jsdelivr.net/npm/espeak-ng@1.0.2/dist/espeak-ng.js")
+      .then((m) => m.default)
+      .catch((e) => { espeakModule = null; throw e; });
+  }
+  return espeakModule;
+}
+
+async function espeakSounds(sentence, voice) {
+  const ESpeakNg = await loadEspeak();
+  const e = await ESpeakNg({
+    arguments: ["--phonout", "out", '--sep=""', "-q", "-b", "1", "--ipa=3", "-v", voice, "-f", "in.txt"],
+    preRun: [(m) => m.FS.writeFile("in.txt", new TextEncoder().encode(sentence))],
+    print: () => {}, printErr: () => {},
+  });
+  return e.FS.readFile("out", { encoding: "utf8" })
+    .replace(/\([^)]*\)/g, "")          // drop language-switch marks like (en) (hi)
+    .replace(/\u200d/g, "")
+    .replace(/\s*\n\s*/g, " ")
+    .trim();
+}
+
+// Sentence by sentence, keeping the punctuation so Kokoro pauses naturally.
+async function kokoroSounds(text, espeakVoice) {
+  const sentences = text.replace(/[।॥]/g, ".").split(/(?<=[.!?…])\s+/).filter((x) => x.trim());
+  const out = [];
+  for (const raw of sentences) {
+    const end = (raw.match(/[.!?…]+$/) || ["."])[0];
+    const sounds = await espeakSounds(raw.replace(/[¿¡]/g, ""), espeakVoice);
+    if (sounds) out.push(sounds + end);
+  }
+  return out.join(" ");
+}
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Used by checks: build the audio for a sentence without playing it.
+export async function kokoroTest(text, langCode) {
+  await warmKokoro();
+  const other = KOKORO_LANG[langCode];
+  const sounds = other ? await kokoroSounds(text, other.espeak) : text;
+  const t0 = performance.now();
+  const audio = other
+    ? await kokoro.generate_from_ids(kokoro.tokenizer(sounds, { truncation: true }).input_ids, { voice: other.voices.warm, speed: 0.95 })
+    : await kokoro.generate(text, { voice: KOKORO_VOICE.warm, speed: 0.95 });
+  return { sounds, seconds: audio.audio.length / audio.sampling_rate, ms: Math.round(performance.now() - t0) };
 }
 
 export function kokoroReady() { return !!kokoro; }
@@ -286,7 +340,8 @@ export function warmKokoro(onProgress) {
         progress_callback: (ev) => { if (ev.status === "progress" && onProgress) onProgress(Math.round(ev.progress || 0)); },
       });
       state.ttsMode = "kokoro";
-      logEvent({ type: "cost", title: "Natural voice ready", detail: `Kokoro runs on this computer (${device}). Spoken answers in English cost nothing.` });
+      if (KOKORO_LANG[state.settings.language]) loadEspeak().catch(() => {});
+      logEvent({ type: "cost", title: "Natural voice ready", detail: `Kokoro runs on this computer (${device}). Spoken answers in English, Spanish and Hindi cost nothing.` });
       return kokoro;
     } catch (e) {
       kokoroFailed = true;
@@ -297,13 +352,23 @@ export function warmKokoro(onProgress) {
   return kokoroLoading;
 }
 
-async function speakKokoro(text, { onStart, onEnd }) {
-  const voice = KOKORO_VOICE[state.settings.voiceStyle] || KOKORO_VOICE.warm;
+async function speakKokoro(text, { onStart, onEnd }, langCode = "en") {
+  const other = KOKORO_LANG[langCode];
+  const style = state.settings.voiceStyle;
+  const voice = other ? (other.voices[style] || other.voices.warm) : (KOKORO_VOICE[style] || KOKORO_VOICE.warm);
   const speed = Math.max(0.75, Math.min(1.15, (state.settings.voiceRate || 0.92) + 0.03));
   const key = await sha256(`kokoro|${voice}|${speed.toFixed(2)}|${text}`);
   let url = kokoroCache.get(key);
   if (!url) {
-    const audio = await kokoro.generate(text, { voice, speed });
+    let audio;
+    if (other) {
+      const sounds = await kokoroSounds(text, other.espeak);
+      if (!sounds) throw new Error("no sounds");
+      const { input_ids } = kokoro.tokenizer(sounds, { truncation: true });
+      audio = await kokoro.generate_from_ids(input_ids, { voice, speed });
+    } else {
+      audio = await kokoro.generate(text, { voice, speed });
+    }
     url = URL.createObjectURL(audio.toBlob());
     kokoroCache.set(key, url);
   }
@@ -323,93 +388,24 @@ export function stopSpeaking() {
   currentUtterance = null;
 }
 
-// Voice order.
-//   Best quality (default):  recorded voice pack → ElevenLabs Multilingual v2
-//                            (when a key is set) → Kokoro (English) → system.
-//   Lowest cost:             recorded voice pack → Kokoro (English) →
-//                            ElevenLabs Flash → system.
-// ElevenLabs stays cached by SHA-256 and capped per month in both modes.
-let voicePack = null;
-async function loadVoicePack() {
-  if (voicePack) return voicePack;
-  try { voicePack = (await import("../voice/manifest.js")).default || {}; } catch { voicePack = {}; }
-  return voicePack;
-}
-
-async function packClip(text, lang, style) {
-  const pack = await loadVoicePack();
-  if (!Object.keys(pack).length) return null;
-  const key = await sha256(`${lang}|${style}|${text}`);
-  return pack[key] ? new URL(`../voice/${pack[key]}`, import.meta.url).href : null;
-}
-
+// Voice order, all free and on this computer (Mac or Windows):
+//   English, Spanish, Hindi: Kokoro, a natural neural voice that runs inside OpenPath.
+//   Chinese (or while Kokoro downloads, or if it fails): the computer's best
+//   built-in voice (Enhanced / Natural voices preferred).
 export async function speak(text, { onStart, onEnd } = {}) {
   stopSpeaking();
   const lang = langInfo(state.settings.language || "en");
-  const style = state.settings.voiceStyle || "warm";
   const pref = state.settings.ttsProvider || "auto";
-  const best = state.settings.qualityMode !== "low";
-  const hasKey = !!(state.settings.elevenLabsKey || "").trim();
-
-  // 1. Voice pack
-  if (pref !== "system") {
-    const clip = await packClip(text, lang.code, style);
-    if (clip) { state.ttsMode = "pack"; return playUrl(clip, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 }); }
-  }
-
-  const tryEleven = async () => {
-    if (!((pref === "auto" || pref === "elevenlabs") && hasKey)) return null;
-    const res = await native.speak({ text, language: lang.code, style });
-    if (res.ok) {
-      state.ttsMode = "elevenlabs";
-      logEvent({ type: "cost", title: res.cached ? "Voice played from cache" : "Voice generated", detail: res.cached ? "0 characters billed" : `${text.length} characters billed` });
-      return playBase64(res.audio, res.mime, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 });
-    }
-    if (res.reason === "bad_key") logEvent({ type: "warn", title: "ElevenLabs key rejected", detail: "Falling back to the free voice" });
-    if (res.reason === "cap") logEvent({ type: "cost", title: "Monthly voice allowance used", detail: "Using the free voice until next month. Change the allowance in Settings → Costs." });
-    return null;
-  };
-  const tryKokoro = async () => {
-    if (!((pref === "auto" || pref === "kokoro") && lang.code === "en")) return null;
+  if ((pref === "auto" || pref === "kokoro") && (lang.code === "en" || KOKORO_LANG[lang.code])) {
     if (!kokoro && !kokoroFailed && !kokoroLoading) warmKokoro();           // start the download for next time
-    if (!kokoro) return null;
-    try { state.ttsMode = "kokoro"; return await speakKokoro(text, { onStart, onEnd }); }
-    catch (e) { logEvent({ type: "warn", title: "Natural voice failed", detail: String(e?.message || e).slice(0, 120) }); return null; }
-  };
-
-  const order = best ? [tryEleven, tryKokoro] : [tryKokoro, tryEleven];
-  for (const attempt of order) {
-    const played = await attempt();
-    if (played !== null) return played;
+    if (KOKORO_LANG[lang.code]) loadEspeak().catch(() => {});
+    if (kokoro) {
+      try { state.ttsMode = "kokoro"; return await speakKokoro(text, { onStart, onEnd }, lang.code); }
+      catch (e) { logEvent({ type: "warn", title: "Natural voice failed", detail: String(e?.message || e).slice(0, 120) }); }
+    }
   }
-
-  // Last: the system voice
   state.ttsMode = "system";
   return speakSystem(text, lang, { onStart, onEnd });
-}
-
-function playUrl(url, { onStart, onEnd, rate }) {
-  return new Promise((resolve) => {
-    const audio = new Audio(url);
-    audio.playbackRate = Math.max(0.7, Math.min(1.2, rate));
-    currentAudio = audio;
-    audio.onplay = () => onStart && onStart();
-    audio.onended = () => { currentAudio = null; onEnd && onEnd(); resolve(true); };
-    audio.onerror = () => { currentAudio = null; onEnd && onEnd(); resolve(false); };
-    audio.play().catch(() => { onEnd && onEnd(); resolve(false); });
-  });
-}
-
-function playBase64(b64, mime, { onStart, onEnd, rate }) {
-  return new Promise((resolve) => {
-    const audio = new Audio(`data:${mime};base64,${b64}`);
-    audio.playbackRate = Math.max(0.7, Math.min(1.2, rate));
-    currentAudio = audio;
-    audio.onplay = () => onStart && onStart();
-    audio.onended = () => { currentAudio = null; onEnd && onEnd(); resolve(true); };
-    audio.onerror = () => { currentAudio = null; onEnd && onEnd(); resolve(false); };
-    audio.play().catch(() => { onEnd && onEnd(); resolve(false); });
-  });
 }
 
 // Pick the most natural installed voice: premium/enhanced/neural builds first,

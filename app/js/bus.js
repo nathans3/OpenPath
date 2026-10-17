@@ -13,7 +13,7 @@ export const state = {
   events: [],              // caregiver alerts, lockdowns, cost events
   lock: null,              // {reasons:[], at}
   sttMode: "detecting",    // local | webspeech | openai | typed
-  ttsMode: "system",       // elevenlabs | system
+  ttsMode: "system",       // kokoro | system
   lastSource: "offline",   // offline | claude | cache
 };
 

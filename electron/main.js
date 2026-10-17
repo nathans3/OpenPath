@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, desktopCapturer, systemPreferences } = require("electron");
 const path = require("path");
 
-// Teammates can put ANTHROPIC_API_KEY=... (and ELEVENLABS_API_KEY, OPENAI_API_KEY)
+// Teammates can put ANTHROPIC_API_KEY=... (and OPENAI_API_KEY)
 // in a .env file next to package.json. It is git-ignored, never committed.
 (function loadDotEnv() {
   try {
@@ -20,7 +20,6 @@ const path = require("path");
 
 const store = require("./services/store");
 const anthropic = require("./services/anthropic");
-const tts = require("./services/tts");
 const vision = require("./services/vision");
 const follow = require("./services/follow");
 const offline = require("./services/offline");
@@ -154,9 +153,6 @@ ipcMain.handle("follow:stop", () => { follow.stop(); return true; });
 ipcMain.handle("follow:status", () => follow.status());
 ipcMain.handle("offline:stats", () => offline.stats());
 ipcMain.handle("follow:permission", () => follow.requestPermission());
-ipcMain.handle("tts:speak", (_e, payload) => tts.synthesize(payload, store.getAll()));
-ipcMain.handle("tts:cacheStats", () => tts.cacheStats());
-ipcMain.handle("tts:clearCache", () => tts.clearCache());
 ipcMain.handle("stt:transcribe", (_e, payload) => stt.transcribe(payload, store.getAll()));
 
 ipcMain.handle("lab:open", () => { createLab(); return true; });

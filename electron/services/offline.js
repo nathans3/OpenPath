@@ -9,7 +9,7 @@
 //
 // Every other web request from OpenPath's windows is blocked while
 // "Local only" is on (the default). The cloud AI services in the main
-// process (Claude, ElevenLabs, Whisper cloud) check the same switch.
+// process (Claude, Whisper cloud) check the same switch.
 
 const { protocol, net, app } = require("electron");
 const { Readable } = require("stream");

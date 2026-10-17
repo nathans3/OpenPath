@@ -9,7 +9,6 @@
   "scripts": {
     "start": "electron .",
     "web": "node scripts/serve.js",
-    "voice-pack": "node scripts/build-voice-pack.mjs",
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",

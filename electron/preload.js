@@ -22,9 +22,6 @@ contextBridge.exposeInMainWorld("openpathNative", {
   offlineStats: () => ipcRenderer.invoke("offline:stats"),
   requestClickPermission: () => ipcRenderer.invoke("follow:permission"),
   onFollow: (cb) => ipcRenderer.on("follow:advance", (_e, evt) => cb(evt)),
-  speak: (payload) => ipcRenderer.invoke("tts:speak", payload),
-  ttsCacheStats: () => ipcRenderer.invoke("tts:cacheStats"),
-  ttsClearCache: () => ipcRenderer.invoke("tts:clearCache"),
   transcribe: (payload) => ipcRenderer.invoke("stt:transcribe", payload),
 
   openLab: () => ipcRenderer.invoke("lab:open"),

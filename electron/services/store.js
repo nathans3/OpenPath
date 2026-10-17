@@ -13,18 +13,15 @@ const DEFAULTS = {
   boxHideSeconds: 15,           // the answer box fades after this many idle seconds; 0 = never
   maxListenMs: 20000,
   sttProvider: "auto",          // auto | local | openai | typed
-  ttsProvider: "auto",          // auto | elevenlabs | system
+  ttsProvider: "auto",          // auto (Kokoro for English, computer voices otherwise) | kokoro | system
   anthropicKey: "",
-  elevenLabsKey: "",
-  elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL",
   openaiKey: "",
   qualityMode: "best",          // best | low
   modelChoice: "",              // "" = follow qualityMode; or a specific Claude model id
-  bestMonthlyCap: 600,          // Opus answers per month, then Haiku until next month
+  bestMonthlyCap: 300,          // expert (Sonnet) answers per month in cloud mode; then Haiku's answer stands
   localOnly: true,              // nothing leaves this computer; cloud AI is off even with a key
   hideFromRecordings: false,    // true = OpenPath does not appear in screen recordings or screen sharing
   screenPictures: "ask",        // ask | on | off — may Claude see a picture of the screen to point?
-  ttsMonthlyCap: 60000,         // ElevenLabs characters per month (≈ $3); then the free voice
   caregiverName: "",
   caregiverPhone: "",
   caregiverWebhook: "",
@@ -32,10 +29,10 @@ const DEFAULTS = {
     plan: "trial",
     trialStartedAt: null,
     setupPaid: false,
-    monthlyPrice: 15,
+    monthlyPrice: 10,
     setupPrice: 29,
   },
-  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0, ttsMonth: "", ttsCharsMonth: 0, llmMonth: "", bestCallsMonth: 0 },
+  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, sttSeconds: 0, cacheHitsLLM: 0, llmMonth: "", bestCallsMonth: 0 },
 };
 
 function readRaw() {

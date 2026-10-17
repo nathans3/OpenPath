@@ -10,11 +10,11 @@ const on = (name, cb) => bus.addEventListener(name, (e) => cb(e.detail));
 const WEB_DEFAULTS = {
   language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000, boxHideSeconds: 15,
   sttProvider: "auto", ttsProvider: "auto",
-  anthropicKey: "", elevenLabsKey: "", elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL", openaiKey: "",
-  qualityMode: "best", modelChoice: "", screenPictures: "ask", ttsMonthlyCap: 60000,
+  anthropicKey: "", openaiKey: "",
+  qualityMode: "best", modelChoice: "", screenPictures: "ask",
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
-  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 15, setupPrice: 29 },
-  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
+  account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 10, setupPrice: 29 },
+  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, sttSeconds: 0, cacheHitsLLM: 0 },
 };
 
 function lsGet(k, fallback) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
@@ -23,42 +23,6 @@ function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch
 async function sha256(str) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// ---- IndexedDB audio cache for the web build ----
-function openDb() {
-  return new Promise((resolve) => {
-    try {
-      const req = indexedDB.open("openpath-cache", 1);
-      req.onupgradeneeded = () => req.result.createObjectStore("tts");
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    } catch { resolve(null); }
-  });
-}
-async function dbGet(key) {
-  const db = await openDb(); if (!db) return null;
-  return new Promise((resolve) => {
-    const tx = db.transaction("tts", "readonly").objectStore("tts").get(key);
-    tx.onsuccess = () => resolve(tx.result || null); tx.onerror = () => resolve(null);
-  });
-}
-async function dbPut(key, val) {
-  const db = await openDb(); if (!db) return;
-  try { db.transaction("tts", "readwrite").objectStore("tts").put(val, key); } catch { /* ignore */ }
-}
-async function dbStats() {
-  const db = await openDb(); if (!db) return { files: 0, bytes: 0 };
-  return new Promise((resolve) => {
-    const store = db.transaction("tts", "readonly").objectStore("tts");
-    const req = store.getAll();
-    req.onsuccess = () => resolve({ files: req.result.length, bytes: req.result.reduce((n, r) => n + (r.audio?.length || 0) * 0.75, 0) });
-    req.onerror = () => resolve({ files: 0, bytes: 0 });
-  });
-}
-async function dbClear() {
-  const db = await openDb(); if (db) { try { db.transaction("tts", "readwrite").objectStore("tts").clear(); } catch { /* ignore */ } }
-  return { files: 0, bytes: 0 };
 }
 
 const WEB_SYSTEM = `You are OpenPath, a patient voice guide for older adults using a computer.
@@ -102,7 +66,7 @@ function webBridge() {
       const apiKey = (settings.anthropicKey || "").trim();
       if (!apiKey) return { ok: false, reason: "no_key" };
       const normalized = query.trim().toLowerCase().replace(/\s+/g, " ");
-      const model = settings.modelChoice || (settings.qualityMode === "low" ? "claude-haiku-5-5" : "claude-opus-5-5");
+      const model = settings.modelChoice || (settings.qualityMode === "low" ? "claude-haiku-5-5" : "claude-sonnet-5-5");
       const key = await sha256(JSON.stringify({ v: 3, model, language, normalized, screen: screen ? [screen.id, ...(screen.elements || [])] : null, recent: (history || []).slice(-2).map((h) => h.text) }));
       if (answerCache[key]) { bump({ cacheHitsLLM: 1 }); return { ok: true, text: answerCache[key], cached: true }; }
       const context = screen ? `Screen the user is looking at: ${screen.title}. Visible elements: ${screen.elements.join("; ")}.` : "Screen context unavailable.";
@@ -141,37 +105,6 @@ function webBridge() {
         return { ok: false, reason: "offline", detail: String(e?.message || e) };
       }
     },
-
-    async speak({ text, language, style }) {
-      const apiKey = (settings.elevenLabsKey || "").trim();
-      if (!apiKey) return { ok: false, reason: "no_key" };
-      const voiceId = settings.elevenLabsVoiceId || "EXAVITQu4vr4xnSDxMaL";
-      const voiceModel = settings.qualityMode === "low" ? "eleven_flash_v2_5" : "eleven_multilingual_v2";
-      const key = await sha256(`${voiceModel}|${voiceId}|${language}|${style}|${text}`);
-      const hit = await dbGet(key);
-      if (hit) { bump({ ttsCacheHits: 1 }); return { ok: true, cached: true, audio: hit.audio, mime: "audio/mpeg" }; }
-      const month = new Date().toISOString().slice(0, 7);
-      const used = settings.usage.ttsMonth === month ? settings.usage.ttsCharsMonth || 0 : 0;
-      if (used + text.length > (settings.ttsMonthlyCap ?? 60000)) return { ok: false, reason: "cap" };
-      try {
-        const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`, {
-          method: "POST",
-          headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ text, model_id: voiceModel, voice_settings: { stability: 0.42, similarity_boost: 0.8, style: style === "warm" ? 0.45 : 0.2, use_speaker_boost: true } }),
-        });
-        if (res.status === 401) return { ok: false, reason: "bad_key" };
-        if (!res.ok) return { ok: false, reason: "error", detail: `ElevenLabs ${res.status}` };
-        const buf = new Uint8Array(await res.arrayBuffer());
-        let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-        const audio = btoa(bin);
-        await dbPut(key, { audio, at: Date.now() });
-        bump({ ttsChars: text.length });
-        settings.usage.ttsMonth = month; settings.usage.ttsCharsMonth = used + text.length; lsSet("openpath-settings", settings);
-        return { ok: true, cached: false, audio, mime: "audio/mpeg" };
-      } catch (e) { return { ok: false, reason: "offline", detail: String(e?.message || e) }; }
-    },
-    ttsCacheStats: dbStats,
-    ttsClearCache: dbClear,
 
     async transcribe({ audioBase64, mime, language, durationSec }) {
       const apiKey = (settings.openaiKey || "").trim();

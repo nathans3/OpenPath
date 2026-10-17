@@ -40,10 +40,10 @@ The first time, macOS asks for three permissions. Allow them in System Settings 
 "Local only" is on by default (Settings → Setup):
 
 - Listening (Whisper), the voice (Kokoro, or the computer's own voices), reading the screen (macOS Vision), pointing, scam protection and all guides run on this computer.
-- The speech models, libraries and fonts download once the first time they are needed, then load from this computer. Every other connection from OpenPath is blocked, and Claude, ElevenLabs and cloud Whisper are never called.
+- The speech models, libraries and fonts download once the first time they are needed, then load from this computer. Every other connection from OpenPath is blocked, and Claude and cloud Whisper are never called.
 - Settings and caches live in OpenPath's folder on this computer. Conversations are not saved. Screen captures are read in memory and never stored.
 
-Turning "Local only" off and adding an Anthropic key in Setup lets OpenPath answer questions the built-in guides do not cover, using Claude Opus 5.5 and a picture of the screen (asked once, never on bank, health or password pages).
+Turning "Local only" off and adding an Anthropic key in Setup lets OpenPath answer questions the built-in guides do not cover, using Claude Sonnet 5.5 and a picture of the screen (asked once, never on bank, health or password pages).
 
 ## Speed
 
@@ -63,7 +63,6 @@ electron/
   preload.js         the only bridge between the UI and Node
   services/
     anthropic.js     Claude via @anthropic-ai/sdk, prompt caching, SHA-256 answer cache
-    tts.js           ElevenLabs with SHA-256 audio cache on disk
     stt.js           Whisper cloud (opt-in)
     store.js         settings JSON
 app/
@@ -75,7 +74,7 @@ app/
     engine.js        request pipeline: redact → scam guardrail → workflow library → Claude → fallback
     guardrails.js    redaction (passwords, SSN, cards, accounts, codes) and scam scoring
     knowledge.js     built-in step-by-step workflows in English, Spanish, Chinese, Hindi
-    speech.js        listening (browser speech / local Whisper / cloud Whisper) with silence cutoff; speaking (ElevenLabs / system)
+    speech.js        listening (browser speech / local Whisper / cloud Whisper) with silence cutoff; speaking (Kokoro for English, Spanish and Hindi; the computer's voice for Chinese)
     circle.js        the floating widget and reply card
     sidebar.js       Voice · Family · Account · Keys · History · Costs
     lab.js           practice screens
@@ -89,11 +88,11 @@ app/
 - **Consent:** the microphone only opens after a deliberate tap and closes by itself after a pause (adjustable 1.2–4.5 s) or 20 s. Nothing streams in the background.
 - **Redaction before anything leaves the device:** passwords, Social Security numbers, card numbers (Luhn-checked), account numbers, one-time codes, dates of birth and emails are replaced with placeholders. Logged in History so a caregiver can see it happened.
 - **Scam interception:** the user's words and the on-screen cues are scored for fake tech support, prizes, gift cards, wire transfers, remote access, government threats, urgency and secrecy. Above the threshold the circle and sidebar lock red, OpenPath refuses, and an alert is logged and optionally POSTed to a caregiver webhook (Zapier, IFTTT, your server).
-- **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Haiku and ElevenLabs Flash by default. The Costs tab shows the running estimate.
+- **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Claude Haiku first in cloud mode. The Costs tab shows the running estimate.
 
 ### Business model (Account tab)
 
-7-day free trial, then **$15/month** (OpenPath Family) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
+7-day free trial, then **$10/month** (OpenPath Family) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
 
 ## Pointing at what to click
 
@@ -105,11 +104,9 @@ When OpenPath gives a step, a bright ring and an arrow appear on the button to p
 
 ## Cost per user
 
-See the team's cost analysis document. In short: about $0.88 a month for an English speaker and about $3.32 for other languages on an average month, against $15. ElevenLabs is the only large cost, so it comes after the free English voice and the pre-recorded guide voice, and it has a monthly cap.
+See the team's cost analysis document. In short: $0.66 per user a month at a $10 price, all of it card fees, however much OpenPath is used. Voices are free: Kokoro for English, Spanish and Hindi on any computer, and the computer's own voice for Chinese.
 
-```bash
-ELEVENLABS_API_KEY=... npm run voice-pack   # records every built-in sentence once (~$1.13)
-```
+Note for the team: the Spanish and Hindi pronunciation step uses espeak-ng, which is GPL-3.0 licensed. OpenPath downloads it at run time instead of bundling it. Check the license before selling a packaged version.
 
 ## Notes for the team
 
