@@ -2,7 +2,7 @@
 // sensitive data and run the scam guardrail before anything reaches here.
 // Answers every question the built-in guides do not cover. Haiku answers first and Sonnet takes over
 // when Haiku's answer cannot be checked on screen; plus a 35-word answer, an
-// on-disk answer cache keyed by SHA-256, prompt caching on the system prompt,
+// in-memory answer cache keyed by SHA-256, prompt caching on the system prompt,
 // and a monthly allowance of expert answers.
 
 const Anthropic = require("@anthropic-ai/sdk");
@@ -12,6 +12,7 @@ const path = require("path");
 const { app } = require("electron");
 const store = require("./store");
 const vision = require("./vision");
+const privacy = require("./privacy");
 
 // ---------- Which model ----------
 // Answers come in two tiers, to keep cost low without lowering quality:
@@ -21,9 +22,14 @@ const vision = require("./vision");
 // A monthly allowance of expert answers (300 by default) keeps a very heavy
 // user's cost bounded; past it, Haiku's answer stands. "Lowest cost" uses
 // Haiku only; a model picked in Setup is used directly. Server-side fallback
-// retries a rare safety decline on another model (Sonnet / Opus / Fable).
+// (retrying a rare safety decline on another model) is switched off, because
+// the retry could land on a model that must keep data for 30 days.
 const BEST = "claude-sonnet-5-5", CHEAP = "claude-haiku-5-5";
-const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
+const FALLBACK_MODELS = new Set();
+// Anthropic's "Covered Models" (Fable, Mythos) must keep every prompt for at
+// least 30 days and cannot use zero data retention, so OpenPath never sends a
+// senior's question to them, even if an older setting names one.
+const COVERED = /fable|mythos/i;
 
 function month() { return new Date().toISOString().slice(0, 7); }
 function expertLeft(settings) {
@@ -32,7 +38,7 @@ function expertLeft(settings) {
 }
 // The first model to ask, and whether a second (expert) try is allowed.
 function plan(settings) {
-  if (settings.modelChoice) return { first: settings.modelChoice, expert: null };
+  if (settings.modelChoice && !COVERED.test(settings.modelChoice)) return { first: settings.modelChoice, expert: null };
   if (settings.qualityMode === "low") return { first: CHEAP, expert: null };
   return { first: CHEAP, expert: expertLeft(settings) ? BEST : null };
 }
@@ -64,20 +70,16 @@ Rules:
 - Often you only know the titles of the open windows. Then rely on what you know about that app's current layout (menu names, where buttons usually are) and say exactly where to look and what to click.
 - If the question could mean two things (for example a browser tab or a tab inside Google Docs), answer the most likely one for the front window and mention the other in a few words.`;
 
-const CACHE_DIR = () => path.join(app.getPath("userData"), "cache", "answers");
-
+// Recent answers are kept in memory only (never on disk), so asking the same
+// thing twice is instant and free. They vanish when OpenPath quits.
+const answerCache = new Map();
 function cacheKey(obj) {
   return crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
 }
-
-function readCache(key) {
-  try { return JSON.parse(fs.readFileSync(path.join(CACHE_DIR(), key + ".json"), "utf8")); } catch { return null; }
-}
+function readCache(key) { return answerCache.get(key) || null; }
 function writeCache(key, value) {
-  try {
-    fs.mkdirSync(CACHE_DIR(), { recursive: true });
-    fs.writeFileSync(path.join(CACHE_DIR(), key + ".json"), JSON.stringify(value));
-  } catch { /* cache is best-effort */ }
+  answerCache.set(key, value);
+  if (answerCache.size > 200) answerCache.delete(answerCache.keys().next().value);
 }
 
 async function instruct({ query, language, screen, history }, settings) {
@@ -165,7 +167,7 @@ function hasProfile() {
 function makeClient(settings) {
   const apiKey = (settings.anthropicKey || process.env.ANTHROPIC_API_KEY || "").trim();
   if (!apiKey && !process.env.ANTHROPIC_AUTH_TOKEN && !hasProfile()) return { client: null, apiKey };
-  try { return { client: apiKey ? new Anthropic({ apiKey }) : new Anthropic(), apiKey }; } catch { return { client: null, apiKey }; }
+  try { return { client: apiKey ? new Anthropic({ apiKey, fetch: privacy.guardedFetch }) : new Anthropic({ fetch: privacy.guardedFetch }), apiKey }; } catch { return { client: null, apiKey }; }
 }
 
 function available(settings) { return !!makeClient(settings).client; }

@@ -27,7 +27,7 @@ let localLoading = null;
 export async function detectSttMode() {
   const pref = state.settings.sttProvider || "auto";
   if (pref === "typed") return "typed";
-  if (pref === "openai") return (state.settings.openaiKey || "").trim() ? "openai" : "typed";
+  if (pref === "openai") return "local";       // cloud listening was removed
   if (pref === "local") return "local";
   // auto: cheapest reliable path per platform
   if (!isDesktop && SR) return "webspeech";

@@ -3,7 +3,7 @@
 // (so the floating circle and sidebar sit above every other app), plus a
 // normal "Test Lab" window that shows realistic practice screens.
 
-const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, desktopCapturer, systemPreferences } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, desktopCapturer, systemPreferences, globalShortcut } = require("electron");
 const path = require("path");
 
 // Teammates can put ANTHROPIC_API_KEY=... (and OPENAI_API_KEY)
@@ -19,6 +19,7 @@ const path = require("path");
 })();
 
 const store = require("./services/store");
+const privacy = require("./services/privacy");
 const anthropic = require("./services/anthropic");
 const vision = require("./services/vision");
 const follow = require("./services/follow");
@@ -59,7 +60,7 @@ function createOverlay() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -100,7 +101,7 @@ function createLab() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
   lab.loadFile(path.join(__dirname, "..", "app", "lab.html"));
@@ -135,11 +136,23 @@ ipcMain.on("overlay:interactive", (_e, interactive) => {
   else overlay.setIgnoreMouseEvents(true, { forward: true });
 });
 
-ipcMain.handle("settings:get", () => store.getAll());
+// The Claude key never goes back to the windows: they only learn whether
+// one is saved.
+const forWindows = (s) => ({ ...s, anthropicKey: "", hasAnthropicKey: anthropic.available(s) });
+ipcMain.handle("settings:get", () => forWindows(store.getAll()));
 ipcMain.handle("settings:set", (_e, patch) => {
+  patch = { ...(patch || {}) };
+  if (patch.forgetKey) { patch.anthropicKey = ""; }
+  else if (!patch.anthropicKey) delete patch.anthropicKey;     // an empty box keeps the saved key
+  delete patch.forgetKey; delete patch.hasAnthropicKey;
   const next = store.patch(patch);
   if ("hideFromRecordings" in patch && overlay) overlay.setContentProtection(next.hideFromRecordings === true);
-  return next;
+  return forWindows(next);
+});
+ipcMain.handle("privacy:deleteAll", async () => {
+  await privacy.deleteAllData();
+  app.relaunch(); app.exit(0);
+  return true;
 });
 
 ipcMain.handle("ai:instruct", (_e, payload) => anthropic.instruct(payload, store.getAll()));
@@ -192,15 +205,25 @@ ipcMain.handle("app:info", () => ({
 
 // ---------- Lifecycle ----------
 app.whenReady().then(() => {
+  privacy.guardMainNetwork();
+  privacy.lockDownWindows();
+  privacy.emptyTempDir();
   if (process.platform === "darwin") app.dock?.hide();
   offline.install(() => store.getAll());
   createOverlay();
   createTray();
+  // Ctrl+O from any app: start listening (press again to stop). This is the
+  // only way OpenPath starts listening besides tapping the circle; the
+  // microphone is never on in the background.
+  const HOTKEY = "Control+O";
+  if (!globalShortcut.register(HOTKEY, () => { if (overlay) overlay.webContents.send("hotkey:talk"); })) {
+    console.warn(`OpenPath: ${HOTKEY} is already used by another app`);
+  }
   // The Test Lab opens only when asked (tray menu, Settings, or OPENPATH_LAB=1).
   if (process.env.OPENPATH_LAB === "1") createLab();
 });
 
-app.on("will-quit", () => { vision.cleanup(); follow.shutdown(); });
+app.on("will-quit", () => { globalShortcut.unregisterAll(); vision.cleanup(); follow.shutdown(); privacy.emptyTempDir(); });
 
 app.on("window-all-closed", () => {
   // Keep running in the tray like a background utility.

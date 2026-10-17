@@ -107,7 +107,7 @@ export async function respond(rawQuery) {
   if (guide) { active = null; return { guide, text: "", source: "offline" }; }
 
   // ---- 4. built-in library ----
-  if (hasOfflineLanguage(lang) || !(state.settings.anthropicKey || "").trim()) {
+  if (hasOfflineLanguage(lang) || !(state.settings.hasAnthropicKey || (state.settings.anthropicKey || "").trim())) {
     const found = findWorkflow(query, lang, screen);
     if (found) {
       const step = workflowStep(found, 0, lang);
@@ -124,7 +124,7 @@ export async function respond(rawQuery) {
   // ---- 5. Claude ----
   // History sent to Claude: earlier turns only (the current question is sent
   // separately), with the visible window titles as screen context.
-  const history = state.history.slice(-5, -1);
+  const history = state.history.slice(-5, -1).map((h) => ({ ...h, text: redact(h.text).text }));
 
   // 5a. On the real screen, Claude can look at a picture of it and point.
   // Only with the person's permission, never on bank/health/password pages.
@@ -176,7 +176,7 @@ async function notifyCaregiver(verdict, query, screen) {
       body: JSON.stringify({
         type: "openpath.scam_blocked", at: new Date().toISOString(),
         category: verdict.category, reasons: verdict.reasons,
-        screen: screen?.title || null, said: redact(query).text,
+        screen: screen?.title ? redact(screen.title).text : null, said: redact(query).text,
       }),
     });
   } catch { /* alerts are best-effort; the lockdown itself does not depend on network */ }
