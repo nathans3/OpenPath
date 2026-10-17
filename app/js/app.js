@@ -366,10 +366,15 @@ export async function startOverlay(root) {
       const below = await native.readRegion({ x: box.x - 40, y: box.y - 8, w: Math.max(box.w + 260, 300), h: box.h + 320 }).catch(() => null);
       if (below?.ok && below.lines.map(normLine).filter((x) => PICK_WORDS[step.pick].test(x)).length >= 2) return "";
     }
-    const res = await native.readRegion(r).catch(() => null);
+    const res = await native.readRegion(r, { boxes: true }).catch(() => null);
     if (!res?.ok) return null;
     const labels = step.labels.map(normLine);
-    return res.lines.map(normLine)
+    // Only text inside the box itself: its value sits on the label's line (or
+    // just under the label once it floats up). The browser's list of saved
+    // names opens below the box, and must not count as typed.
+    const top = box.y - 6, bottom = box.y + box.h + 28;
+    const lines = res.items ? res.items.filter((it) => { const cy = it.y + it.h / 2; return cy >= top && cy <= bottom; }).map((it) => it.text) : res.lines;
+    return lines.map(normLine)
       .filter((x) => x && !/^gmail ?com$/.test(x) && !labels.some((l) => l.includes(x) || x.includes(l)))
       .join(" ");
   }

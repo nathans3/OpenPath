@@ -305,7 +305,7 @@ async function browserUrl() {
 
 // Every line of text inside `region` (screen points). Used to notice that the
 // screen changed after the person clicked (a menu opened, a tab appeared).
-async function readRegion(region, exclude) {
+async function readRegion(region, exclude, { boxes = false } = {}) {
   if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
   const d = screen.getPrimaryDisplay().bounds;
   const r = { x: Math.max(0, region.x), y: Math.max(0, region.y) };
@@ -314,6 +314,8 @@ async function readRegion(region, exclude) {
     // Detailed reading at full resolution: small text (a menu, a typed name)
     // must not be missed.
     const m = await helperRead({ labels: [], fast: false, scale: 2, rect: r });
+    if (m && boxes) return { ok: true, lines: m.map((x) => x.text.trim()).filter(Boolean),
+      items: m.filter((x) => x.text.trim()).map((x) => ({ text: x.text.trim(), x: r.x + x.x * r.w, y: r.y + x.y * r.h, w: x.w * r.w, h: x.h * r.h })) };
     if (m) return { ok: true, lines: m.map((x) => x.text.trim()).filter(Boolean) };
   }
   let file = null;
