@@ -186,6 +186,20 @@ export async function startOverlay(root) {
     }
   }
 
+  // true: the browser in front shows a page of the sign-up (Google's account
+  // pages, Gmail, or the Google home page) · false: some other address, such
+  // as a search results page · null: unknown (no browser in front, or the
+  // address could not be read), which never counts as the wrong page.
+  async function onGoogle(run) {
+    if (!native.browserUrl) return null;
+    const u = await native.browserUrl().catch(() => null);
+    if (guideRun !== run || !u?.ok || !u.isBrowser || !u.url) return null;
+    const a = u.url.toLowerCase().replace(/\s/g, "").replace(/^https?:\/\//, "");
+    if (/^(accounts|myaccount|mail|support)\.google\./.test(a) || /^(www\.)?gmail\.com/.test(a)) return true;
+    if (/^(www\.)?google\.[a-z.]+(\/(\?.*|webhp.*|#.*)?)?$/.test(a)) return true;     // the Google home page
+    return false;
+  }
+
   async function detectPage(run) {
     const res = await native.findAll(detectWords(run.guide), overlayRects());
     if (!res?.ok || !res.found.length) return null;
@@ -219,10 +233,13 @@ export async function startOverlay(root) {
       const hit = await detectPage(run);
       if (guideRun !== run) return;
       if (hit && (hit.page.id !== fromId || Date.now() - began > 4000)) return showGuidePage(run, hit, { quiet: hit.page.id === fromId });
-      if (!hit && Date.now() - began > 7000 && Date.now() - run.lastWrong > 30000) {
-        const front = (await native.screenContext())?.windows?.[0] || "";
+      if (!hit && Date.now() - began > 7000 && Date.now() - run.lastWrong > 30000 && Date.now() - (run.lastSeen || 0) > 15000) {
+        // Only when the browser in front shows a web address that is not
+        // Google. Google's sign-up tabs have titles like "Basic information",
+        // so a window title says nothing; an unknown address says nothing too.
+        if (await onGoogle(run) !== false) { await new Promise((r) => setTimeout(r, 300)); continue; }
         if (guideRun !== run) return;
-        if (!/google|gmail/i.test(front)) {
+        {
           run.lastWrong = Date.now();
           const text = sayIn(run.guide.wrongPage, lang());
           pointer.hide();
@@ -236,26 +253,34 @@ export async function startOverlay(root) {
   }
 
   async function showGuidePage(run, { page, head }, { quiet = false } = {}) {
-    run.page = page; run.head = head; run.phase = 0;
-    const text = sayIn(page.text, lang());
+    run.page = page; run.head = head; run.phase = 0; run.lastSeen = Date.now();
+    run.steps = stepsOf(page); run.stepIndex = 0; run.skipOne = false;
+    clearTimeout(run.stepTimer);
     circle.show();
     pointer.hide();
+    // One step at a time: find the first box, then say only that step (the
+    // words can depend on which box Google is showing).
+    const near = head ? { x: head.x + head.w / 2, y: head.y + head.h + 120 } : null;
+    const first = run.steps.length ? await native.locate(run.steps[0].labels, near, overlayRects()) : null;
+    if (guideRun !== run || run.page !== page) return;
+    const variant = first?.ok && page.textIf ? page.textIf[first.box.text] : null;
+    const text = sayIn(variant || page.text, lang());
+    run.lastLine = text;
     if (!quiet) {
       circle.setTranscript("");
       circle.setReply(text, { src: "offline" });
       state.history.push({ role: "assistant", text, at: Date.now() });
-      say(text);                                  // speak while the pointer is found
+      say(text);
     } else { setStatus("idle"); circle.setStatus("idle"); }
     if (page.done) { guideRun = null; return; }
-    run.steps = stepsOf(page); run.stepIndex = 0;
-    if (run.steps.length) await pointAtStep(run, page, head ? { x: head.x + head.w / 2, y: head.y + head.h + 120 } : null);
+    if (run.steps.length) await pointAtStep(run, page, near, first);
     guidePoll(run, page);
   }
 
   // Points at the current box of the page and watches for it to be filled in.
-  async function pointAtStep(run, page, near) {
+  async function pointAtStep(run, page, near, found) {
     const step = run.steps[run.stepIndex];
-    const f = await native.locate(step.labels, near || state.lastPoint, overlayRects());
+    const f = found || await native.locate(step.labels, near || state.lastPoint, overlayRects());
     if (guideRun !== run || run.page !== page) return;
     clearTimeout(run.stepTimer);
     if (f?.ok) { pointer.show(f.box, state.lastPoint || circle.center()); state.lastPoint = centerOf(f.box); circle.keepClear(f.box); }
@@ -265,7 +290,8 @@ export async function startOverlay(root) {
     const more = run.stepIndex < run.steps.length - 1;
     if (!more) { stopWatching(); return; }                    // the last box (Next): the page change moves on
     if (step.after) run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
-    else if (f?.ok) watchGuide(run, f.box, "text-or-page");
+    else if (f?.ok) watchGuide(run, f.box, step.pick ? "value" : "text-or-page", step.pick);
+    else run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) pointAtStep(run, page, near); }, 1500);   // not on screen yet: look again
   }
 
   async function advanceStep(run, page) {
@@ -276,7 +302,7 @@ export async function startOverlay(root) {
     const step = run.steps[run.stepIndex];
     const cue = step.cue === "next" ? t(lang(), "nowNext") : step.cue ? sayIn(step.cue, lang()) : null;
     circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
-    if (cue) { circle.setReply(cue, { src: "offline" }); say(cue); }
+    if (cue) { run.lastLine = cue; circle.setReply(cue, { src: "offline" }); say(cue); }
     await pointAtStep(run, page, state.lastPoint);
   }
 
@@ -292,19 +318,25 @@ export async function startOverlay(root) {
       const hit = await detectPage(run);
       if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
       if (hit && hit.page.id !== page.id) { stopWatching(); return showGuidePage(run, hit); }
-      if (hit) { misses = 0; continue; }
-      // Nothing of the guide is on screen for ~5 s: the person may be lost.
-      if (++misses >= 7) { stopWatching(); pointer.hide(); return waitForPage(run, null); }
+      if (hit) { misses = 0; run.lastSeen = Date.now(); continue; }
+      // Nothing of the guide is on screen for a while: the person may be lost.
+      // A list, a pop-up or scrolling can hide the heading, so only leave the
+      // page when the browser has also left Google.
+      if (++misses >= 10) {
+        if (await onGoogle(run) !== false) { misses = 0; continue; }
+        if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
+        stopWatching(); pointer.hide(); return waitForPage(run, null);
+      }
     }
   }
 
-  function watchGuide(run, box, mode) {
+  function watchGuide(run, box, mode, pick) {
     const id = ++watchId;
     watching = { id, out: { guide: true }, run };
     const area = run.head || box;
     setTimeout(() => {
       if (watching?.id !== id) return;
-      native.watchTarget({ id, mode, clicks: false, exclude: overlayRects(),
+      native.watchTarget({ id, mode, pick, clicks: false, exclude: overlayRects(),
         box: box ? { x: box.x, y: box.y, w: box.w, h: box.h } : { x: area.x, y: area.y, w: area.w, h: area.h },
         area: mode === "page" && run.head ? { x: run.head.x, y: run.head.y, w: run.head.w, h: run.head.h } : undefined,
       }).catch(() => {});
@@ -315,7 +347,12 @@ export async function startOverlay(root) {
     if (guideRun !== run) return;
     // A box was filled in: move to the next one. Page changes and menus are
     // picked up by guidePoll.
-    if (evt.reason === "typed") advanceStep(run, run.page);
+    if (evt.reason === "typed") return advanceStep(run, run.page);
+    // "page": most words around the box changed. A real new page is picked up
+    // by guidePoll; if the page is still the same (a list opened over the
+    // boxes, an error message), keep watching the same box.
+    const page = run.page, idx = run.stepIndex;
+    setTimeout(() => { if (guideRun === run && run.page === page && run.stepIndex === idx) pointAtStep(run, page, state.lastPoint); }, 1500);
   }
 
   // The person pressed the button (or the screen changed around it): give the
@@ -353,7 +390,7 @@ export async function startOverlay(root) {
     lastQuery = text;
     pointer.hide();
     stopWatching();
-    if (guideRun && isRepeatAsk(text)) { const pg = guideRun.page; if (pg) { circle.setTranscript(text); return say(sayIn(pg.text, lang())); } }
+    if (guideRun && isRepeatAsk(text)) { const line = guideRun.lastLine || (guideRun.page && sayIn(guideRun.page.text, lang())); if (line) { circle.setTranscript(text); circle.setReply(line, { src: "offline" }); return say(line); } }
     guideRun = null;
     circle.show();
     circle.setTranscript(text);

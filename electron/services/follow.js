@@ -66,11 +66,19 @@ const isNew = (line, set) => ![...set].some((b) => similar(line, b));
 // Short lines are usually stray marks, except numbers: a typed day ("12") counts.
 const clean = (lines) => new Set(lines.filter((raw) => !isClock(raw)).map(normalize).filter((t) => t.length >= 3 || /^\d+$/.test(t)));
 
+// What a list box shows once something is picked (Google's Month and Gender).
+const PICKS = {
+  month: /^(january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)$/,
+  gender: /^(female|male|rather not say|custom|woman|man|mujer|hombre|prefiero no decirlo|personalizado)$/,
+};
+
 // mode: "any"  (default) a click in the ring, typing, or a page change
 //       "text-or-page"   typing or a page change, reported separately
 //       "page"           only a page change (most of the old words are gone)
+//       "value"          a list box: done when exactly one choice shows (the
+//                        list closed on a pick); an open list shows many
 // area: where to look for changes (defaults to the box), e.g. a page heading.
-async function watch(webContents, { id, box, area, clicks = true, mode = "any", exclude = [] }) {
+async function watch(webContents, { id, box, area, clicks = true, mode = "any", exclude = [], pick = null }) {
   stop();
   const d = screen.getPrimaryDisplay().bounds;
   const a = area || box;
@@ -78,7 +86,7 @@ async function watch(webContents, { id, box, area, clicks = true, mode = "any", 
     x: Math.max(d.x, a.x - 420), y: Math.max(d.y, a.y - 80),
     w: Math.min(d.width, a.w + 840), h: Math.min(d.height, a.h + 560),
   };
-  const me = { id, box, region, clicks: clicks && mode === "any", mode, exclude, webContents, started: Date.now(), baseline: null, timer: null };
+  const me = { id, box, region, clicks: clicks && mode === "any", mode, exclude, webContents, started: Date.now(), baseline: null, timer: null, pick: PICKS[pick] || null };
   current = me;
   const usingHook = ensureHook();
   // Two looks make the starting picture, so reading noise is not a "change".
@@ -102,6 +110,13 @@ async function poll(me) {
   me.busy = false;
   if (current !== me || !res.ok) return;
   const now = clean(res.lines);
+  if (me.mode === "value" && me.pick) {
+    const hits = [...now].filter((t) => me.pick.test(t));
+    if (hits.length !== 1) { me.pending = null; return; }
+    if (me.pending === "V" + hits[0]) return fire(me.id, "typed");   // same single choice on two looks
+    me.pending = "V" + hits[0];
+    return;
+  }
   const added = [...now].filter((t) => isNew(t, me.baseline));
   const gone = [...me.baseline].filter((t) => isNew(t, now)).length;
   const page = gone >= Math.max(3, me.baseline.size * 0.5);

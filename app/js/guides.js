@@ -10,7 +10,12 @@
 // target.labels  words on the page to point at
 // target.steps   several boxes in order: the pointer moves to the next one once
 //                the box shows what was typed or picked ("after": move on after
-//                that many ms instead, for passwords); "cue" is said at each move
+//                that many ms instead, for passwords); "cue" is said at each move.
+//                Everything is one step at a time: a page's "text" covers only
+//                its first box, and each later box has its own "cue".
+//                "pick": the box is a list (Month, Gender); it counts as done
+//                when exactly one choice shows, i.e. the list closed on a pick.
+// textIf         a different first line when the first box found is that label
 // The guide moves on when the page changes, not when Next is clicked, so a
 // Google error ("That username is taken") keeps the person on the same step.
 
@@ -90,46 +95,46 @@ export const GUIDES = {
         target: { steps: [
           { labels: ["First name"] },
           { labels: ["Last name (optional)", "Last name"], cue: {
-            en: "Good. Now type your last name in the box below, or leave it empty.",
-            es: "Bien. Ahora escriba su apellido en el cuadro de abajo, o déjelo en blanco.",
-            zh: "很好。现在在下面的框里输入您的姓，也可以不填。",
-            hi: "बहुत अच्छे। अब नीचे वाले खाने में अपना उपनाम लिखिए, या उसे खाली छोड़ दीजिए।" } },
+            en: "Good. Now click the Last name box and type your last name. If you'd rather not, just click Next.",
+            es: "Bien. Ahora haga clic en el cuadro Last name y escriba su apellido. Si prefiere no hacerlo, haga clic en Next.",
+            zh: "很好。现在点 Last name 框，输入您的姓。如果不想填，直接点 Next。",
+            hi: "बहुत अच्छे। अब Last name वाले खाने पर क्लिक करके अपना उपनाम लिखिए। अगर नहीं लिखना चाहते, तो सीधे Next पर क्लिक कीजिए।" } },
           { labels: ["Next"], cue: "next" },
         ] },
         text: {
-          en: "This is Google's sign-up page. Click the box that says First name and type your first name. You can type your last name in the box below it. Then click the blue Next button.",
-          es: "Esta es la página de registro de Google. Haga clic en el cuadro que dice First name y escriba su nombre. Puede escribir su apellido en el cuadro de abajo. Luego haga clic en el botón azul Next.",
-          zh: "这是谷歌的注册页面。点写着 First name 的框，输入您的名字。下面的框可以输入您的姓。然后点蓝色的 Next 按钮。",
-          hi: "यह Google का साइन-अप पेज है। First name वाले खाने पर क्लिक करके अपना पहला नाम लिखिए। उसके नीचे वाले खाने में अपना उपनाम लिख सकते हैं। फिर नीले Next बटन पर क्लिक कीजिए।",
+          en: "This is Google's sign-up page. Click the First name box and type your first name.",
+          es: "Esta es la página de registro de Google. Haga clic en el cuadro First name y escriba su nombre.",
+          zh: "这是谷歌的注册页面。点 First name 框，输入您的名字。",
+          hi: "यह Google का साइन-अप पेज है। First name वाले खाने पर क्लिक करके अपना पहला नाम लिखिए।",
         },
       },
       {
         id: "birthday",
         detect: ["Enter your birthday and gender", "Basic information"],
         target: { steps: [
-          { labels: ["Month"] },
+          { labels: ["Month"], pick: "month" },
           { labels: ["Day"], cue: {
-            en: "Good. Now type the day you were born in the Day box.",
-            es: "Bien. Ahora escriba el día en que nació en el cuadro Day.",
-            zh: "很好。现在在 Day 框里输入您出生的日期。",
-            hi: "बहुत अच्छे। अब Day वाले खाने में अपने जन्म की तारीख लिखिए।" } },
+            en: "Good. Now click the Day box and type the day you were born.",
+            es: "Bien. Ahora haga clic en el cuadro Day y escriba el día en que nació.",
+            zh: "很好。现在点 Day 框，输入您出生的日期。",
+            hi: "बहुत अच्छे। अब Day वाले खाने पर क्लिक करके अपने जन्म की तारीख लिखिए।" } },
           { labels: ["Year"], cue: {
-            en: "Now type the year you were born, all four numbers, in the Year box.",
-            es: "Ahora escriba el año en que nació, los cuatro números, en el cuadro Year.",
-            zh: "现在在 Year 框里输入您出生的年份，四位数字。",
-            hi: "अब Year वाले खाने में अपने जन्म का साल लिखिए, चारों अंक।" } },
-          { labels: ["Gender"], cue: {
-            en: "Now click Gender and pick one. You can choose Rather not say.",
-            es: "Ahora haga clic en Gender y elija una opción. Puede elegir Rather not say.",
-            zh: "现在点 Gender，选一个。也可以选 Rather not say。",
-            hi: "अब Gender पर क्लिक करके एक चुनिए। आप Rather not say भी चुन सकते हैं।" } },
+            en: "Good. Now click the Year box and type the year you were born, all four numbers.",
+            es: "Bien. Ahora haga clic en el cuadro Year y escriba el año en que nació, los cuatro números.",
+            zh: "很好。现在点 Year 框，输入您出生的年份，四位数字。",
+            hi: "बहुत अच्छे। अब Year वाले खाने पर क्लिक करके अपने जन्म का साल लिखिए, चारों अंक।" } },
+          { labels: ["Gender"], pick: "gender", cue: {
+            en: "Good. Now click the Gender box and pick one. You can choose Rather not say.",
+            es: "Bien. Ahora haga clic en el cuadro Gender y elija una opción. Puede elegir Rather not say.",
+            zh: "很好。现在点 Gender 框，选一个。也可以选 Rather not say。",
+            hi: "बहुत अच्छे। अब Gender वाले खाने पर क्लिक करके एक चुनिए। आप Rather not say भी चुन सकते हैं।" } },
           { labels: ["Next"], cue: "next" },
         ] },
         text: {
-          en: "Now your birthday. Click the box that says Month and pick your birth month. Then type the day and the year in the boxes next to it. Below that, choose your gender. Then click Next.",
-          es: "Ahora su fecha de nacimiento. Haga clic en el cuadro Month y elija el mes. Luego escriba el día y el año en los cuadros de al lado. Debajo, elija su género. Luego haga clic en Next.",
-          zh: "现在填生日。点写着 Month 的框，选您出生的月份。然后在旁边的框里输入日期和年份。下面选择您的性别。然后点 Next。",
-          hi: "अब आपका जन्मदिन। Month वाले खाने पर क्लिक करके अपने जन्म का महीना चुनिए। फिर उसके पास वाले खानों में तारीख और साल लिखिए। उसके नीचे अपना लिंग चुनिए। फिर Next पर क्लिक कीजिए।",
+          en: "Now your birthday. Click the Month box and pick the month you were born.",
+          es: "Ahora su fecha de nacimiento. Haga clic en el cuadro Month y elija el mes en que nació.",
+          zh: "现在填生日。点 Month 框，选您出生的月份。",
+          hi: "अब आपका जन्मदिन। Month वाले खाने पर क्लिक करके अपने जन्म का महीना चुनिए।",
         },
       },
       {
@@ -147,13 +152,25 @@ export const GUIDES = {
             es: "Bien. Ahora escriba el nombre que quiera en el cuadro Username. Use letras y números, sin espacios.",
             zh: "很好。现在在 Username 框里输入您想要的名字。用字母和数字，不要空格。",
             hi: "बहुत अच्छे। अब Username वाले खाने में अपनी पसंद का नाम लिखिए। अक्षर और अंक इस्तेमाल कीजिए, बीच में जगह मत छोड़िए।" } },
-          { labels: ["Next"], cue: "next" },
+          { labels: ["Next"], cue: {
+            en: "Good. Now click Next. If Google says that name is taken, add a few numbers to the end.",
+            es: "Bien. Ahora haga clic en Next. Si Google dice que ese nombre ya existe, agregue unos números al final.",
+            zh: "很好。现在点 Next。如果谷歌说这个名字已经被用了，就在后面加几个数字。",
+            hi: "बहुत अच्छे। अब Next पर क्लिक कीजिए। अगर Google कहे कि यह नाम पहले से लिया हुआ है, तो आखिर में कुछ अंक जोड़ दीजिए।" } },
         ] },
+        textIf: {
+          Username: {
+            en: "Now pick your new email address. Click the Username box and type the name you want. Use letters and numbers, no spaces.",
+            es: "Ahora elija su nueva dirección de correo. Haga clic en el cuadro Username y escriba el nombre que quiera. Use letras y números, sin espacios.",
+            zh: "现在选择您的新邮箱地址。点 Username 框，输入您想要的名字。用字母和数字，不要空格。",
+            hi: "अब अपना नया ईमेल पता चुनिए। Username वाले खाने पर क्लिक करके अपनी पसंद का नाम लिखिए। अक्षर और अंक इस्तेमाल कीजिए, बीच में जगह मत छोड़िए।",
+          },
+        },
         text: {
-          en: "Now pick your new email address. If Google shows suggestions, click one you like, or click Create your own Gmail address. Otherwise, type the name you want in the Username box. Then click Next. If Google says it's taken, add a few numbers to the end.",
-          es: "Ahora elija su nueva dirección de correo. Si Google muestra sugerencias, haga clic en una que le guste, o en Create your own Gmail address. Si no, escriba el nombre que quiera en el cuadro Username. Luego haga clic en Next. Si Google dice que ya existe, agregue unos números al final.",
-          zh: "现在选择您的新邮箱地址。如果谷歌给了建议，点一个您喜欢的，或者点 Create your own Gmail address。如果没有，就在 Username 框里输入您想要的名字。然后点 Next。如果谷歌说已经被用了，就在后面加几个数字。",
-          hi: "अब अपना नया ईमेल पता चुनिए। अगर Google सुझाव दिखाए, तो जो पसंद हो उस पर क्लिक कीजिए, या Create your own Gmail address पर क्लिक कीजिए। नहीं तो Username वाले खाने में अपनी पसंद का नाम लिखिए। फिर Next पर क्लिक कीजिए। अगर Google कहे कि यह पहले से लिया हुआ है, तो आखिर में कुछ अंक जोड़ दीजिए।",
+          en: "Now pick your new email address. Click one of Google's suggestions if you like it, or click Create your own Gmail address.",
+          es: "Ahora elija su nueva dirección de correo. Haga clic en una de las sugerencias de Google si le gusta, o en Create your own Gmail address.",
+          zh: "现在选择您的新邮箱地址。如果喜欢谷歌的某个建议就点它，或者点 Create your own Gmail address。",
+          hi: "अब अपना नया ईमेल पता चुनिए। Google के सुझावों में से कोई पसंद हो तो उस पर क्लिक कीजिए, या Create your own Gmail address पर क्लिक कीजिए।",
         },
       },
       {
@@ -164,17 +181,17 @@ export const GUIDES = {
         target: { steps: [
           { labels: ["Password"], after: 14000 },
           { labels: ["Confirm"], after: 12000, cue: {
-            en: "Now type the same password again in the Confirm box.",
-            es: "Ahora escriba la misma contraseña otra vez en el cuadro Confirm.",
-            zh: "现在在 Confirm 框里再输入一遍同样的密码。",
-            hi: "अब वही पासवर्ड Confirm वाले खाने में दोबारा लिखिए।" } },
+            en: "Now click the Confirm box and type the same password again.",
+            es: "Ahora haga clic en el cuadro Confirm y escriba la misma contraseña otra vez.",
+            zh: "现在点 Confirm 框，再输入一遍同样的密码。",
+            hi: "अब Confirm वाले खाने पर क्लिक करके वही पासवर्ड दोबारा लिखिए।" } },
           { labels: ["Next"], cue: "next" },
         ] },
         text: {
-          en: "Now make up a password: at least 8 letters, numbers and symbols. Type it in the Password box, then type the same password again in the Confirm box. Write it on paper and keep it somewhere safe. I won't read it. Then click Next.",
-          es: "Ahora invente una contraseña: al menos 8 letras, números y símbolos. Escríbala en el cuadro Password y luego escríbala igual en el cuadro Confirm. Anótela en un papel y guárdela en un lugar seguro. Yo no la leeré. Luego haga clic en Next.",
-          zh: "现在设一个密码：至少 8 个字母、数字和符号。在 Password 框里输入，然后在 Confirm 框里再输入一遍同样的密码。把它写在纸上，放在安全的地方。我不会看它。然后点 Next。",
-          hi: "अब एक पासवर्ड बनाइए: कम से कम 8 अक्षर, अंक और चिह्न। उसे Password वाले खाने में लिखिए, फिर वही पासवर्ड Confirm वाले खाने में दोबारा लिखिए। उसे कागज़ पर लिखकर किसी सुरक्षित जगह रखिए। मैं उसे नहीं पढ़ूँगी। फिर Next पर क्लिक कीजिए।",
+          en: "Now make up a password, at least 8 letters, numbers and symbols. Write it on paper and keep it somewhere safe. I won't read it. Click the Password box and type it.",
+          es: "Ahora invente una contraseña de al menos 8 letras, números y símbolos. Anótela en un papel y guárdela en un lugar seguro. Yo no la leeré. Haga clic en el cuadro Password y escríbala.",
+          zh: "现在设一个密码，至少 8 个字母、数字和符号。把它写在纸上，放在安全的地方。我不会看它。点 Password 框，输入密码。",
+          hi: "अब एक पासवर्ड बनाइए, कम से कम 8 अक्षर, अंक और चिह्न। उसे कागज़ पर लिखकर किसी सुरक्षित जगह रखिए। मैं उसे नहीं पढ़ूँगी। Password वाले खाने पर क्लिक करके उसे लिखिए।",
         },
       },
       {
@@ -191,12 +208,16 @@ export const GUIDES = {
       {
         id: "phone",
         detect: ["Confirm you're not a robot", "Get a verification code", "Verify your phone number", "Add phone number"],
-        target: { steps: [{ labels: ["Phone number"] }, { labels: ["Next", "Yes, I'm in"], cue: "next" }] },
+        target: { steps: [{ labels: ["Phone number"] }, { labels: ["Next", "Yes, I'm in"], cue: {
+          en: "Good. Now click Next. Google will text you a short code.",
+          es: "Bien. Ahora haga clic en Next. Google le enviará un código corto por mensaje.",
+          zh: "很好。现在点 Next。谷歌会给您发一条短信验证码。",
+          hi: "बहुत अच्छे। अब Next पर क्लिक कीजिए। Google आपको एक छोटा कोड मैसेज करेगा।" } }] },
         text: {
-          en: "Google wants your mobile phone number to keep your account safe. Click the Phone number box and type your number. Then click Next. Google will text you a short code.",
-          es: "Google pide su número de celular para proteger su cuenta. Haga clic en el cuadro Phone number y escriba su número. Luego haga clic en Next. Google le enviará un código corto por mensaje.",
-          zh: "谷歌需要您的手机号码来保护账号安全。点 Phone number 框，输入您的手机号码。然后点 Next。谷歌会给您发一条短信验证码。",
-          hi: "आपके अकाउंट को सुरक्षित रखने के लिए Google आपका मोबाइल नंबर माँगता है। Phone number वाले खाने पर क्लिक करके अपना नंबर लिखिए। फिर Next पर क्लिक कीजिए। Google आपको एक छोटा कोड मैसेज करेगा।",
+          en: "Google wants your mobile phone number to keep your account safe. Click the Phone number box and type your number.",
+          es: "Google pide su número de celular para proteger su cuenta. Haga clic en el cuadro Phone number y escriba su número.",
+          zh: "谷歌需要您的手机号码来保护账号安全。点 Phone number 框，输入您的手机号码。",
+          hi: "आपके अकाउंट को सुरक्षित रखने के लिए Google आपका मोबाइल नंबर माँगता है। Phone number वाले खाने पर क्लिक करके अपना नंबर लिखिए।",
         },
       },
       {
@@ -204,10 +225,10 @@ export const GUIDES = {
         detect: ["Enter the code", "Enter code", "verification code"],
         target: { steps: [{ labels: ["Enter code", "Code"] }, { labels: ["Next", "Verify"], cue: "next" }] },
         text: {
-          en: "Look at your phone for a text message from Google with a code, like G dash and 6 numbers. Type just the 6 numbers in the box, then click Next. Never tell this code to anyone who calls you.",
-          es: "Busque en su teléfono un mensaje de Google con un código, como G guion y 6 números. Escriba solo los 6 números en el cuadro y haga clic en Next. Nunca le dé este código a nadie que la llame.",
-          zh: "看看手机上谷歌发来的短信，里面有一个验证码，比如 G 加 6 个数字。在框里只输入这 6 个数字，然后点 Next。不要把这个验证码告诉打电话给您的任何人。",
-          hi: "अपने फ़ोन पर Google का मैसेज देखिए, उसमें एक कोड होगा, जैसे G के बाद 6 अंक। खाने में सिर्फ़ 6 अंक लिखिए, फिर Next पर क्लिक कीजिए। यह कोड फ़ोन करने वाले किसी को भी कभी मत बताइए।",
+          en: "Look at your phone for a text message from Google with a code, like G dash and 6 numbers. Click the box and type just the 6 numbers. Never tell this code to anyone who calls you.",
+          es: "Busque en su teléfono un mensaje de Google con un código, como G guion y 6 números. Haga clic en el cuadro y escriba solo los 6 números. Nunca le dé este código a nadie que la llame.",
+          zh: "看看手机上谷歌发来的短信，里面有一个验证码，比如 G 加 6 个数字。点那个框，只输入这 6 个数字。不要把这个验证码告诉打电话给您的任何人。",
+          hi: "अपने फ़ोन पर Google का मैसेज देखिए, उसमें एक कोड होगा, जैसे G के बाद 6 अंक। खाने पर क्लिक करके सिर्फ़ 6 अंक लिखिए। यह कोड फ़ोन करने वाले किसी को भी कभी मत बताइए।",
         },
       },
       {
@@ -294,6 +315,7 @@ export function allGuideLines(lang) {
     for (const d of [g.start, g.wrongPage]) out.push(say(d, lang));
     for (const p of g.pages) {
       out.push(say(p.text, lang));
+      for (const v of Object.values(p.textIf || {})) out.push(say(v, lang));
       for (const st of p.target?.steps || []) if (st.cue && st.cue !== "next") out.push(say(st.cue, lang));
     }
   }
