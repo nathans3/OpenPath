@@ -38,9 +38,14 @@ export function mountPointer(root) {
     const L = state.settings?.language || "en";
     const label = box.tag || (box.text ? `${t(L, "clickHere")}: ${box.text}` : t(L, "clickHere"));
     tag.textContent = label;
-    const below = y + h + 56 < v.bottom;
-    tag.style.left = Math.max(v.left + 8, Math.min(v.right - 260, x)) + "px";
-    tag.style.top = (below ? y + h + 14 : Math.max(v.top + 4, y - 46)) + "px";
+    // The label sits beside the ring (right, else left), never below it,
+    // because menus and lists usually open below what was clicked.
+    tag.style.left = "0px"; tag.style.top = "0px";
+    const tw = Math.min(320, tag.offsetWidth || 220), th = tag.offsetHeight || 38;
+    const right = x + w + 14 + tw < v.right;
+    const tx = right ? x + w + 14 : Math.max(v.left + 8, x - tw - 14);
+    tag.style.left = tx + "px";
+    tag.style.top = Math.max(v.top + 4, Math.min(v.bottom - th - 4, y + h / 2 - th / 2)) + "px";
 
     // Arrow tip lands just below-right of the target's center.
     const tipX = box.x + box.w / 2, tipY = box.y + box.h / 2;

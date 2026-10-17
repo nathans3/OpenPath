@@ -237,8 +237,28 @@ export async function startOverlay(root) {
       if (guideRun !== run) return;
       if (f?.ok) { box = f.box; pointer.show(box, circle.center()); state.lastPoint = centerOf(box); }
     }
-    const mode = page.watch === "change" ? "text-or-page" : page.target?.then && box ? "text-or-page" : "page";
-    watchGuide(run, box, mode);
+    if (box) circle.keepClear(box);                     // the answer box never covers what to click
+    // Typing watch: only to move the pointer to Next after the person types.
+    if (page.target?.then && box) watchGuide(run, box, "text-or-page");
+    guidePoll(run, page);
+  }
+
+  // While a page is showing, look at the whole screen about once a second for
+  // any page or menu of the guide. A menu opening (Google's "For my personal
+  // use" list) or a new page gets its step within about a second.
+  async function guidePoll(run, page) {
+    const token = (run.pollToken = (run.pollToken || 0) + 1);
+    let misses = 0;
+    while (guideRun === run && run.page === page && run.pollToken === token) {
+      await new Promise((r) => setTimeout(r, 700));
+      if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
+      const hit = await detectPage(run);
+      if (guideRun !== run || run.page !== page || run.pollToken !== token) return;
+      if (hit && hit.page.id !== page.id) { stopWatching(); return showGuidePage(run, hit); }
+      if (hit) { misses = 0; continue; }
+      // Nothing of the guide is on screen for ~5 s: the person may be lost.
+      if (++misses >= 7) { stopWatching(); pointer.hide(); return waitForPage(run, null); }
+    }
   }
 
   function watchGuide(run, box, mode) {
@@ -263,14 +283,12 @@ export async function startOverlay(root) {
       const f = await native.locate(run.page.target.then, near, overlayRects());
       if (guideRun !== run) return;
       if (f?.ok) { pointer.show(f.box, near); state.lastPoint = centerOf(f.box); }
+      if (f?.ok) circle.keepClear(f.box);
       circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
-      watchGuide(run, f?.ok ? f.box : null, "page");
       say(t(lang(), "nowNext"));
       return;
     }
-    // Something changed (a new page, or a menu opened): find out what is showing.
-    pointer.hide();
-    waitForPage(run, run.page?.id);
+    // Page changes and menus are picked up by guidePoll.
   }
 
   // The person pressed the button (or the screen changed around it): give the

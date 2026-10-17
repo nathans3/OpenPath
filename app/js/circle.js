@@ -239,6 +239,17 @@ export function mountCircle(root, handlers) {
       place();
     },
     center() { const r = circle.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+    // Moves the answer box to the other side of the circle if it would cover
+    // the thing to click or the space just below it (where menus open).
+    keepClear(screenBox) {
+      const b = { x: screenBox.x - window.screenX - 20, y: screenBox.y - window.screenY - 20, w: screenBox.w + 40, h: screenBox.h + 300 };
+      const hits = () => { const r = card.getBoundingClientRect(); return !card.hidden && r.x < b.x + b.w && r.x + r.width > b.x && r.y < b.y + b.h && r.y + r.height > b.y; };
+      if (!hits()) return;
+      const { x } = current();
+      side = parseFloat(card.style.left || "0") < x ? "right" : "left";
+      place();
+      if (hits()) { side = side === "left" ? "right" : "left"; place(); conceal(card); }   // no room either side: fade it out
+    },
     showTyping(hint) { reveal(form); input.placeholder = hint || t(lang(), "typePlaceholder"); input.focus(); place(); },
     show() { reveal(card); place(); quickLabels(); armIdle(); },
     hide() { conceal(card); setTimeout(quickLabels, 220); },
