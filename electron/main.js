@@ -214,6 +214,7 @@ app.whenReady().then(() => {
   offline.install(() => store.getAll());
   createOverlay();
   createTray();
+  console.info("[openpath] click and Enter tracking: " + (follow.status().clicks ? "on" : "needs the Accessibility permission"));
   // Ctrl+O from any app: start listening (press again to stop). This is the
   // only way OpenPath starts listening besides tapping the circle; the
   // microphone is never on in the background.
