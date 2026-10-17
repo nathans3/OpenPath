@@ -135,12 +135,25 @@ export const GUIDES = {
       {
         id: "username",
         detect: ["Choose your Gmail address", "Pick a Gmail address", "How you'll sign in", "Create a Gmail address"],
-        target: { labels: ["Create your own Gmail address", "Create a Gmail address", "Create your own"] },
+        // Box by box. Never the heading "Create a Gmail address for signing
+        // in…": that is Google's instruction line, not something to click.
+        // Some sign-ups list suggestions with a "Create your own Gmail address"
+        // choice; others show the Username box straight away (then the second
+        // step is skipped).
+        target: { steps: [
+          { labels: ["Create your own Gmail address", "Create your own", "Username"], skipNextIf: "Username" },
+          { labels: ["Username"], cue: {
+            en: "Good. Now type the name you want in the Username box. Use letters and numbers, no spaces.",
+            es: "Bien. Ahora escriba el nombre que quiera en el cuadro Username. Use letras y números, sin espacios.",
+            zh: "很好。现在在 Username 框里输入您想要的名字。用字母和数字，不要空格。",
+            hi: "बहुत अच्छे। अब Username वाले खाने में अपनी पसंद का नाम लिखिए। अक्षर और अंक इस्तेमाल कीजिए, बीच में जगह मत छोड़िए।" } },
+          { labels: ["Next"], cue: "next" },
+        ] },
         text: {
-          en: "Now pick your new email address. Google shows a few suggestions. Click one you like, or click Create your own Gmail address and type the name you want. Then click Next. If Google says it's taken, add a few numbers to the end.",
-          es: "Ahora elija su nueva dirección de correo. Google muestra algunas sugerencias. Haga clic en una que le guste, o en Create your own Gmail address y escriba el nombre que quiera. Luego haga clic en Next. Si Google dice que ya existe, agregue unos números al final.",
-          zh: "现在选择您的新邮箱地址。谷歌会给几个建议。点一个您喜欢的，或者点 Create your own Gmail address，输入您想要的名字。然后点 Next。如果谷歌说已经被用了，就在后面加几个数字。",
-          hi: "अब अपना नया ईमेल पता चुनिए। Google कुछ सुझाव दिखाता है। जो पसंद हो उस पर क्लिक कीजिए, या Create your own Gmail address पर क्लिक करके अपनी पसंद का नाम लिखिए। फिर Next पर क्लिक कीजिए। अगर Google कहे कि यह पहले से लिया हुआ है, तो आखिर में कुछ अंक जोड़ दीजिए।",
+          en: "Now pick your new email address. If Google shows suggestions, click one you like, or click Create your own Gmail address. Otherwise, type the name you want in the Username box. Then click Next. If Google says it's taken, add a few numbers to the end.",
+          es: "Ahora elija su nueva dirección de correo. Si Google muestra sugerencias, haga clic en una que le guste, o en Create your own Gmail address. Si no, escriba el nombre que quiera en el cuadro Username. Luego haga clic en Next. Si Google dice que ya existe, agregue unos números al final.",
+          zh: "现在选择您的新邮箱地址。如果谷歌给了建议，点一个您喜欢的，或者点 Create your own Gmail address。如果没有，就在 Username 框里输入您想要的名字。然后点 Next。如果谷歌说已经被用了，就在后面加几个数字。",
+          hi: "अब अपना नया ईमेल पता चुनिए। अगर Google सुझाव दिखाए, तो जो पसंद हो उस पर क्लिक कीजिए, या Create your own Gmail address पर क्लिक कीजिए। नहीं तो Username वाले खाने में अपनी पसंद का नाम लिखिए। फिर Next पर क्लिक कीजिए। अगर Google कहे कि यह पहले से लिया हुआ है, तो आखिर में कुछ अंक जोड़ दीजिए।",
         },
       },
       {

@@ -108,7 +108,7 @@ export async function startOverlay(root) {
         return;
       }
       if (result.reason === "local_failed") {
-        circle.setReply(t(lang(), "noMic"));
+        circle.setReply(t(lang(), "sttFailed"));
         circle.showTyping(); setIdle(); return;
       }
       circle.setReply(t(lang(), "didntCatch"));
@@ -259,6 +259,9 @@ export async function startOverlay(root) {
     if (guideRun !== run || run.page !== page) return;
     clearTimeout(run.stepTimer);
     if (f?.ok) { pointer.show(f.box, state.lastPoint || circle.center()); state.lastPoint = centerOf(f.box); circle.keepClear(f.box); }
+    // Found the box the next step would point at (Google showed the Username
+    // box straight away): skip that step instead of asking twice.
+    run.skipOne = !!(f?.ok && step.skipNextIf && f.box.text === step.skipNextIf);
     const more = run.stepIndex < run.steps.length - 1;
     if (!more) { stopWatching(); return; }                    // the last box (Next): the page change moves on
     if (step.after) run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) advanceStep(run, page); }, step.after);
@@ -268,7 +271,8 @@ export async function startOverlay(root) {
   async function advanceStep(run, page) {
     if (guideRun !== run || run.page !== page || run.stepIndex >= run.steps.length - 1) return;
     stopWatching();
-    run.stepIndex++;
+    run.stepIndex = Math.min(run.steps.length - 1, run.stepIndex + (run.skipOne ? 2 : 1));
+    run.skipOne = false;
     const step = run.steps[run.stepIndex];
     const cue = step.cue === "next" ? t(lang(), "nowNext") : step.cue ? sayIn(step.cue, lang()) : null;
     circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
@@ -416,9 +420,15 @@ export async function startOverlay(root) {
     sidebar.close();
   }
 
+  // A newer line can interrupt one still being spoken. Only the newest line
+  // returns OpenPath to idle, so the box's close timer starts after the last
+  // instruction has finished, not when an interrupted one stops.
+  let sayToken = 0;
   async function say(text, { keepLocked } = {}) {
+    const mine = ++sayToken;
     setStatus(keepLocked ? "locked" : "speaking"); circle.setStatus(keepLocked ? "locked" : "speaking");
     await speak(text, {});
+    if (mine !== sayToken) return;
     if (state.status !== "locked") setIdle();
   }
 
