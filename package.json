@@ -1,0 +1,31 @@
+{
+  "name": "openpath",
+  "productName": "OpenPath",
+  "version": "0.1.0",
+  "description": "A floating voice assistant for seniors: one tap, one clear spoken step at a time, with built-in scam protection.",
+  "main": "electron/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "web": "node scripts/serve.js",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  },
+  "build": {
+    "appId": "org.openpath.app",
+    "productName": "OpenPath",
+    "files": ["electron/**", "app/**", "package.json"],
+    "mac": { "category": "public.app-category.utilities", "target": ["dmg", "zip"] },
+    "win": { "target": ["nsis", "portable"] },
+    "directories": { "output": "release" }
+  }
+}
