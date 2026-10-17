@@ -357,14 +357,16 @@ export async function startOverlay(root) {
   const normLine = (x) => x.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim();
   const PICK_WORDS = {
     month: /^(january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)$/,
-    gender: /^(female|male|rather not say|custom|woman|man|mujer|hombre|prefiero no decirlo|personalizado)$/,
+    gender: /^(female|male|rather not say|prefer not to say|custom|woman|man|mujer|hombre|prefiero no decirlo|personalizado)$/,
   };
-  async function fieldValue(step, box) {
+  // The lines of text inside a box, minus its own label. null = could not
+  // read; "open" = a list box whose list is open (no choice yet).
+  async function boxLines(step, box) {
     const r = { x: box.x - 12, y: box.y - 8, w: Math.max(box.w + 120, 150), h: box.h + 36 };
     if (step.pick && PICK_WORDS[step.pick]) {
       // A list box: while its list is open, several choices show below it.
       const below = await native.readRegion({ x: box.x - 40, y: box.y - 8, w: Math.max(box.w + 260, 300), h: box.h + 320 }).catch(() => null);
-      if (below?.ok && below.lines.map(normLine).filter((x) => PICK_WORDS[step.pick].test(x)).length >= 2) return "";
+      if (below?.ok && below.lines.map(normLine).filter((x) => PICK_WORDS[step.pick].test(x)).length >= 2) return "open";
     }
     const res = await native.readRegion(r, { boxes: true }).catch(() => null);
     if (!res?.ok) return null;
@@ -375,22 +377,40 @@ export async function startOverlay(root) {
     const top = box.y - 6, bottom = box.y + box.h + 28;
     const lines = res.items ? res.items.filter((it) => { const cy = it.y + it.h / 2; return cy >= top && cy <= bottom; }).map((it) => it.text) : res.lines;
     return lines.map(normLine)
-      .filter((x) => x && !/^gmail ?com$/.test(x) && !labels.some((l) => l.includes(x) || x.includes(l)))
-      .join(" ");
+      .filter((x) => x && !/^gmail ?com$/.test(x) && !labels.some((l) => l.includes(x) || x.includes(l)));
   }
 
-  // Moves on once the box holds something and it has stayed the same for 2 s
-  // (the person finished typing, or the browser filled it in for them).
+  // Is this what a person would put in the box? A list box needs a real
+  // choice (a month, a gender); a text box needs at least 2 letters or
+  // numbers, or a number (a day). A blinking text cursor read as "I", or a
+  // list arrow read as "v", is not an answer.
+  function realValue(step, v) {
+    if (!v) return false;
+    if (step.pick && PICK_WORDS[step.pick]) return PICK_WORDS[step.pick].test(v);
+    const core = v.replace(/[^\p{L}\p{N}]/gu, "");
+    return /^\d+$/.test(core) ? core.length >= 1 : core.length >= 2;
+  }
+  // Length and kind only, for the log: never what was typed.
+  const shape = (v) => `${v.replace(/\s/g, "").length} ${/^\d+$/.test(v.replace(/\s/g, "")) ? "digits" : "chars"}`;
+
+  // Moves on once the box holds a real answer that was not there when the
+  // step began, and it has stayed the same for a moment (the person finished
+  // typing or picking). Enter and clicks are watched separately.
   async function watchField(run, page, step, box) {
     const idx = run.stepIndex, token = (run.fieldToken = (run.fieldToken || 0) + 1);
-    let last = null, since = 0;
+    let base = null, last = null, since = 0;
     while (guideRun === run && run.page === page && run.stepIndex === idx && run.fieldToken === token) {
-      const v = await fieldValue(step, box);
+      const lines = await boxLines(step, box);
       if (guideRun !== run || run.page !== page || run.stepIndex !== idx || run.fieldToken !== token) return;
-      if (v) {
-        if (v !== last) { last = v; since = Date.now(); }
-        else if (Date.now() - since >= 1300) { glog("box filled: " + step.labels[0]); return advanceStep(run, page); }
-      } else { last = null; }
+      if (Array.isArray(lines)) {
+        if (!base) { base = new Set(lines); if (lines.length) glog(`box ${step.labels[0]} starts with ${lines.length} line(s), ignored`); }
+        const v = lines.filter((x) => !base.has(x)).join(" ");
+        if (realValue(step, v)) {
+          const wait = /^\d$/.test(v.replace(/\s/g, "")) ? 2500 : 1500;          // one digit: maybe more coming
+          if (v !== last) { last = v; since = Date.now(); }
+          else if (Date.now() - since >= wait) { glog(`box filled: ${step.labels[0]} (${shape(v)})`); return advanceStep(run, page); }
+        } else { last = null; }
+      } else if (lines === "open") { last = null; }
       await new Promise((r) => setTimeout(r, 300));
     }
   }
