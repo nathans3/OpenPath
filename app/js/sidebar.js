@@ -5,7 +5,7 @@ import { LANGUAGES, t, hasFullUi } from "./i18n.js";
 import { speak, warmLocalWhisper, warmKokoro, kokoroState } from "./speech.js";
 import { hasOfflineLanguage } from "./knowledge.js";
 
-const PRICE = { haikuIn: 0.10, haikuOut: 0.50, opusIn: 4, opusOut: 20, elevenPer1k: 0.05, whisperPerMin: 0.006 };
+const PRICE = { haikuIn: 0.10, haikuOut: 0.50, opusIn: 4, opusOut: 20, elevenPer1k: 0.10, whisperPerMin: 0.006 };   // ElevenLabs Multilingual v2 rate (Flash: 0.05)
 
 export function mountSidebar(root) {
   const side = document.createElement("aside");
@@ -32,6 +32,12 @@ export function mountSidebar(root) {
 
   const PANELS = {
     voice: (lang) => `
+      <div class="op-field"><span class="lbl">Quality</span>
+        <div class="op-langs">
+          <button type="button" data-quality="best" aria-pressed="${(s().qualityMode || "best") !== "low"}"><span>Best quality</span><small>Claude Opus 5.5, ElevenLabs Multilingual v2, Whisper small</small></button>
+          <button type="button" data-quality="low" aria-pressed="${s().qualityMode === "low"}"><span>Lowest cost</span><small>Claude Haiku 5.5, free English voice, Whisper base</small></button>
+        </div>
+        <p class="op-help">Full answers to any question need an Anthropic API key, added once in the Setup tab. Without one, OpenPath uses its built-in guides.</p></div>
       <div class="op-status-line">
         <span class="op-chip ${state.sttMode === "typed" ? "warn" : "ok"}">🎙 ${sttLabel()}</span>
         <span class="op-chip ${state.ttsMode === "elevenlabs" || state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${{ elevenlabs: "ElevenLabs", kokoro: "Natural voice (local)", pack: "Recorded voice", system: "System voice" }[state.ttsMode] || "System voice"}</span>
@@ -48,6 +54,8 @@ export function mountSidebar(root) {
         <input type="range" id="op-pause" min="1200" max="4500" step="100" value="${s().autoSilenceMs}">
         <div class="op-range-labels"><span>${t(lang, "short")} (1.2s)</span><span>${(s().autoSilenceMs / 1000).toFixed(1)}s</span><span>${t(lang, "long")} (4.5s)</span></div>
         <p class="op-help">How long I wait after you stop talking before I answer. Longer is kinder when you pause to think. I always stop listening after ${Math.round(s().maxListenMs / 1000)} seconds.</p></div>
+      <div class="op-field"><label for="op-hide">Hide the answer box when I leave it alone for</label>
+        <select id="op-hide">${[[10, "10 seconds"], [15, "15 seconds"], [30, "30 seconds"], [60, "1 minute"], [0, "Never"]].map(([v, l]) => `<option value="${v}" ${(s().boxHideSeconds ?? 15) === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="op-field"><label for="op-stt">${t(lang, "micMode")}</label>
         <select id="op-stt">
           <option value="auto" ${s().sttProvider === "auto" ? "selected" : ""}>Automatic (best free option)</option>
@@ -70,10 +78,12 @@ export function mountSidebar(root) {
           <option value="calm" ${s().voiceStyle === "calm" ? "selected" : ""}>Calm</option>
           <option value="male" ${s().voiceStyle === "male" ? "selected" : ""}>Male</option>
         </select></div>
+      ${isDesktop ? `<div class="op-field"><span class="lbl">Following your clicks</span>
+        <p class="op-help">After OpenPath points at a button, it notices when you press it and gives the next step. It already watches the screen around the button. To react the instant you click, allow OpenPath under Accessibility once. It only checks where you clicked; nothing is recorded.</p>
+        <div class="op-row"><span class="op-chip" id="op-follow-chip">Checking…</span><button type="button" class="op-btn ghost" id="op-follow-perm">Allow click detection</button></div></div>` : ""}
       ${isDesktop ? `<div class="op-field"><span class="lbl">Screen awareness</span>
-        <p class="op-help">When no practice screen is picked, OpenPath reads the names of your open windows each time you ask, so it knows what you are looking at. No screenshots. On a Mac this needs the Screen Recording permission.</p>
-        <button type="button" class="op-btn ghost" id="op-screen-perm" style="justify-self:start">Open Screen Recording settings</button></div>` : ""}
-      <div class="op-row"><button class="op-btn primary" type="button" id="op-sample">▶ ${t(lang, "hearSample")}</button><button class="op-btn" type="button" id="op-lab">${t(lang, "testLab")}</button></div>`,
+        <p class="op-help">OpenPath reads your screen on this computer to know which page you are on and where to point. Nothing is saved or sent. On a Mac, allow it once: System Settings → Privacy &amp; Security → Screen Recording → turn on OpenPath.</p></div>` : ""}
+      <div class="op-row"><button class="op-btn primary" type="button" id="op-sample">▶ ${t(lang, "hearSample")}</button></div>`,
 
     family: (lang) => `
       <p class="op-help">When OpenPath blocks a scam it locks the screen and tells this person. Alerts are also listed under History.</p>
@@ -104,19 +114,20 @@ export function mountSidebar(root) {
         ${a.setupPaid ? "" : `<button class="op-btn" type="button" id="op-setup">${t(lang, "paySetup")}</button>`}
       </div>
       <div class="op-plan"><strong>Unit economics</strong>
-        <ul><li>Average month (8 questions a day): about $0.88 in total costs for an English speaker and about $3.32 for other languages, against $${a.monthlyPrice}</li><li>Heavy users (40 questions a day) stay under about $4 because the ElevenLabs allowance caps the only large cost</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
+        <ul><li>Best quality, average month (8 questions a day): about $8.40 in total costs against $${a.monthlyPrice}</li><li>Lowest cost, average month: about $0.88 (English) to $3.32 (other languages)</li><li>Monthly allowances (600 Opus answers, 60,000 voice characters) keep heavy users under the price</li><li>Card processing (2.9% + $0.30, plus billing) is about $0.84 of each $${a.monthlyPrice} payment</li></ul></div>
       <p class="op-help">Payments in this demo are simulated. Production uses Stripe Checkout for the setup fee and a Stripe subscription for the monthly plan.</p>`;
     },
 
     keys: () => `
-      <p class="op-help">OpenPath works with no keys at all, using built-in answers and your computer's own voices. Add keys to unlock Claude answers for any question, the warm ElevenLabs voice, or cloud Whisper. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
+      ${isDesktop ? `<div class="op-field"><span class="lbl">Local only</span>
+        <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="op-local" ${s().localOnly !== false ? "checked" : ""} style="width:22px;height:22px"> Nothing leaves this computer (recommended)</label>
+        <p class="op-help">Listening, the voice, reading the screen, pointing, scam protection and the built-in guides all run on this computer. Settings stay in OpenPath's folder on this computer; conversations are not saved. The speech models are saved here once (<span id="op-offline-size">checking…</span>), then work without internet. Turn this off only to use cloud AI for questions the guides do not cover.</p></div>` : ""}
+      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath works with no keys at all, using built-in guides and the computer's own voices. Add keys to unlock Claude answers for any question, the warm ElevenLabs voice, or cloud Whisper. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
       <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off">
-        <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys. <button type="button" class="op-btn ghost" id="op-get-key" style="min-height:36px;padding:4px 10px;font-size:14px">Open the key page</button></p></div>
+        <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys.</p></div>
       <div class="op-field"><label for="op-model">Claude model</label>
         <select id="op-model">
-          <option value="claude-haiku-5-5" ${s().model === "claude-haiku-5-5" ? "selected" : ""}>Claude Haiku 5.5 — fast and lightweight (default)</option>
-          <option value="claude-sonnet-5-5" ${s().model === "claude-sonnet-5-5" ? "selected" : ""}>Claude Sonnet 5.5</option>
-          <option value="claude-opus-5-5" ${s().model === "claude-opus-5-5" ? "selected" : ""}>Claude Opus 5.5 — most capable</option>
+          ${[["", "Automatic: follows Quality (Opus 5.5, or Haiku 5.5 for lowest cost)"], ["claude-fable-5-1", "Claude Fable 5.1: the most capable, slowest and most expensive"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
         </select></div>
       <div class="op-field"><label for="op-k-eleven">ElevenLabs API key</label><input type="password" id="op-k-eleven" value="${esc(s().elevenLabsKey)}" placeholder="xi-…" autocomplete="off"></div>
       <div class="op-field"><label for="op-k-voice">ElevenLabs voice ID</label><input type="text" id="op-k-voice" value="${esc(s().elevenLabsVoiceId)}"></div>
@@ -151,7 +162,7 @@ export function mountSidebar(root) {
 
     costs: () => {
       const u = s().usage;
-      const isOpus = s().model === "claude-opus-5-5";
+      const isOpus = (s().qualityMode || "best") !== "low" && (s().modelChoice || "claude-opus-5-5") !== "claude-haiku-5-5";
       const llm = (u.llmInputTokens / 1e6) * (isOpus ? PRICE.opusIn : PRICE.haikuIn) + (u.llmOutputTokens / 1e6) * (isOpus ? PRICE.opusOut : PRICE.haikuOut);
       const tts = (u.ttsChars / 1000) * PRICE.elevenPer1k;
       const stt = (s().sttProvider === "openai" ? u.sttSeconds / 60 : 0) * PRICE.whisperPerMin;
@@ -196,9 +207,11 @@ export function mountSidebar(root) {
     }
     const $ = (sel) => side.querySelector(sel);
 
+    side.querySelectorAll("[data-quality]").forEach((b) => b.addEventListener("click", async () => { await saveSettings({ qualityMode: b.dataset.quality }); render(); }));
     $("[data-lang]") && side.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", async () => { await saveSettings({ language: b.dataset.lang }); render(); }));
     $("#op-rate")?.addEventListener("change", (e) => saveSettings({ voiceRate: +e.target.value }));
     $("#op-pause")?.addEventListener("change", (e) => { saveSettings({ autoSilenceMs: +e.target.value }); });
+    $("#op-hide")?.addEventListener("change", (e) => saveSettings({ boxHideSeconds: +e.target.value }));
     $("#op-stt")?.addEventListener("change", (e) => saveSettings({ sttProvider: e.target.value }));
     $("#op-tts")?.addEventListener("change", (e) => saveSettings({ ttsProvider: e.target.value }));
     $("#op-style")?.addEventListener("change", (e) => saveSettings({ voiceStyle: e.target.value }));
@@ -209,10 +222,11 @@ export function mountSidebar(root) {
       render();
     });
     $("#op-sample")?.addEventListener("click", () => speak(t(L(), "sample")));
-    $("#op-lab")?.addEventListener("click", () => native.openLab());
+    $("#op-local")?.addEventListener("change", (e) => saveSettings({ localOnly: e.target.checked }));
+    if ($("#op-offline-size") && native.offlineStats) native.offlineStats().then((st) => { const el = $("#op-offline-size"); if (el) el.textContent = st.files ? `${st.files} files, ${(st.bytes / 1e6).toFixed(0)} MB saved` : "not saved yet; happens the first time you use them"; });
     $("#op-pics")?.addEventListener("change", (e) => saveSettings({ screenPictures: e.target.value }));
-    $("#op-get-key")?.addEventListener("click", () => native.openExternal("https://console.anthropic.com/settings/keys"));
-    $("#op-screen-perm")?.addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
+    $("#op-follow-perm")?.addEventListener("click", async () => { await native.requestClickPermission(); setTimeout(render, 1500); });
+    if ($("#op-follow-chip") && native.followStatus) native.followStatus().then((st) => { const c = $("#op-follow-chip"); if (!c) return; c.textContent = st.clicks ? "Clicks: on" : "Clicks: watching the screen"; c.className = "op-chip " + (st.clicks ? "ok" : ""); if (st.clicks) { const b = $("#op-follow-perm"); if (b) b.hidden = true; } });
     $("#op-warm")?.addEventListener("click", async () => {
       const st = $("#op-warm-status"); st.textContent = "Downloading…";
       const p = await warmLocalWhisper((pct) => { st.textContent = `Downloading ${pct}%`; });
@@ -228,7 +242,7 @@ export function mountSidebar(root) {
     $("#op-setup")?.addEventListener("click", async () => { await saveSettings({ account: { setupPaid: true } }); logEvent({ type: "cost", title: "Setup fee paid", detail: `$${s().account.setupPrice} one-time (simulated checkout)` }); render(); });
 
     $("#op-save-keys")?.addEventListener("click", async () => {
-      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), elevenLabsKey: $("#op-k-eleven").value.trim(), elevenLabsVoiceId: $("#op-k-voice").value.trim(), openaiKey: $("#op-k-openai").value.trim(), model: $("#op-model").value });
+      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), elevenLabsKey: $("#op-k-eleven").value.trim(), elevenLabsVoiceId: $("#op-k-voice").value.trim(), openaiKey: $("#op-k-openai").value.trim(), modelChoice: $("#op-model").value });
       logEvent({ type: "cost", title: "Keys saved", detail: [s().anthropicKey && "Claude", s().elevenLabsKey && "ElevenLabs", s().openaiKey && "Whisper cloud"].filter(Boolean).join(", ") || "No keys: offline mode" });
       render();
     });

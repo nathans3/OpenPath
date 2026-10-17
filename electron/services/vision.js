@@ -32,7 +32,7 @@ function run(argv) {
   const url = $.NSURL.fileURLWithPath(argv[0]);
   const handler = $.VNImageRequestHandler.alloc.initWithURLOptions(url, $({}));
   const req = $.VNRecognizeTextRequest.alloc.init;
-  req.recognitionLevel = 0;
+  req.recognitionLevel = argv[2] === "fast" ? 1 : 0;
   req.usesLanguageCorrection = false;
   try { req.automaticallyDetectsLanguage = true; } catch (e) {}
   handler.performRequestsError($([req]), null);
@@ -44,6 +44,7 @@ function run(argv) {
     const text = cand.string.js;
     const lower = text.toLowerCase();
     const lb = obs.boundingBox;
+    if (!labels.length) { out.push({ text: text, x: lb.origin.x, y: 1 - lb.origin.y - lb.size.height, w: lb.size.width, h: lb.size.height }); continue; }
     for (const label of labels) {
       const idx = lower.indexOf(label.toLowerCase());
       if (idx < 0) continue;
@@ -74,41 +75,123 @@ function ocrScriptPath() {
   return scriptFile;
 }
 
-async function captureDisplay() {
-  const d = screen.getPrimaryDisplay();
-  const width = Math.round(d.size.width * d.scaleFactor);
-  const height = Math.round(d.size.height * d.scaleFactor);
-  const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width, height } });
-  const src = sources.find((s) => s.display_id === String(d.id)) || sources[0];
-  if (!src || src.thumbnail.isEmpty()) throw new Error("capture_failed");
-  return { image: src.thumbnail, display: d };
+// One capture at a time; a failed capture is retried; checks that come
+// within 120 ms of each other share the same capture.
+let captureChain = Promise.resolve();
+const recent = new Map();   // scale → { at, result }
+
+async function captureOnce(sf, d) {
+  const width = Math.round(d.size.width * sf), height = Math.round(d.size.height * sf);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width, height } });
+    const src = sources.find((x) => x.display_id === String(d.id)) || sources[0];
+    if (src && !src.thumbnail.isEmpty()) return { image: src.thumbnail, display: d };
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  throw new Error("capture_failed");
 }
 
-function runOcr(file, labels) {
+function captureDisplay({ scale } = {}) {
+  const d = screen.getPrimaryDisplay();
+  const sf = scale || d.scaleFactor;
+  const hit = recent.get(sf);
+  if (hit && Date.now() - hit.at < 120) return hit.result;
+  const result = captureChain.then(() => captureOnce(sf, d));
+  captureChain = result.catch(() => {});
+  recent.set(sf, { at: Date.now(), result });
+  return result;
+}
+
+// The fast path: a small helper (electron/native/ocr-helper.swift) that stays
+// running, so a check does not pay to start a new process. Built with
+// `npm run build-helper`; if it is missing, the osascript path below is used.
+const { spawn } = require("child_process");
+const HELPER = path.join(__dirname, "..", "native", "bin", "ocr-helper").replace("app.asar" + path.sep, "app.asar.unpacked" + path.sep);
+let helper = null, helperBroken = false, helperQueue = Promise.resolve();
+
+function startHelper() {
+  if (helper) return helper;
+  if (helperBroken || process.platform !== "darwin" || !fs.existsSync(HELPER)) return null;
+  try {
+    helper = spawn(HELPER, [], { stdio: ["pipe", "pipe", process.env.OPENPATH_DEBUG_VISION ? "inherit" : "ignore"] });
+    helper.buf = ""; helper.waiters = [];
+    helper.stdout.on("data", (chunk) => {
+      helper.buf += chunk.toString("utf8");
+      let i;
+      while ((i = helper.buf.indexOf("\n")) >= 0) {
+        const line = helper.buf.slice(0, i); helper.buf = helper.buf.slice(i + 1);
+        const w = helper.waiters.shift(); if (w) w(line);
+      }
+    });
+    helper.on("exit", (code, sig) => { if (process.env.OPENPATH_DEBUG_VISION) console.log("helper exit", code, sig); helper = null; });
+    helper.on("error", () => { helper = null; helperBroken = true; });
+  } catch { helper = null; helperBroken = true; }
+  return helper;
+}
+
+function helperAsk(request) {
+  const run = () => new Promise((resolve) => {
+    const h = startHelper();
+    if (!h) return resolve(null);
+    const timer = setTimeout(() => { resolve(null); }, 8000);
+    h.waiters.push((line) => { clearTimeout(timer); try { resolve(JSON.parse(line)); } catch { resolve(null); } });
+    h.stdin.write(JSON.stringify(request) + "\n");
+  });
+  const result = helperQueue.then(run);
+  helperQueue = result.catch(() => {});
+  return result;
+}
+
+async function runOcr(file, labels, { fast = false } = {}) {
+  const viaHelper = await helperAsk({ file, labels, fast });
+  if (viaHelper?.ok) return { ok: true, matches: viaHelper.matches };
+  return runOcrScript(file, labels, { fast });
+}
+
+// Capture + read inside the helper: no image file, and OpenPath's own windows
+// are left out of the picture. Returns null when the helper is not available.
+async function helperRead({ labels, fast = false, scale = 2, rect = null }) {
+  if (helperBroken || !fs.existsSync(HELPER) || process.platform !== "darwin") return null;
+  const res = await helperAsk({ labels, fast, scale, rect: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : undefined });
+  if (process.env.OPENPATH_DEBUG_VISION) console.log("helper", res ? (res.ok ? "ok " + res.matches.length : res.reason) : "no answer");
+  return res?.ok ? res.matches : null;
+}
+
+function runOcrScript(file, labels, { fast = false } = {}) {
   return new Promise((resolve) => {
-    execFile("osascript", ["-l", "JavaScript", ocrScriptPath(), file, JSON.stringify(labels)], { maxBuffer: 1 << 24, timeout: 8000 }, (err, stdout) => {
+    execFile("osascript", ["-l", "JavaScript", ocrScriptPath(), file, JSON.stringify(labels), fast ? "fast" : "accurate"], { maxBuffer: 1 << 24, timeout: 8000 }, (err, stdout) => {
       if (err) return resolve({ ok: false, reason: "ocr_failed", detail: String(err.message || err).slice(0, 200) });
       try { resolve({ ok: true, matches: JSON.parse(stdout) }); } catch { resolve({ ok: false, reason: "ocr_failed" }); }
     });
   });
 }
 
-// Finds the best on-screen match for any of `labels`. `near` (overlay
-// coordinates) prefers matches close to where OpenPath pointed last, which is
-// how "Tab" is found inside the Insert menu rather than in the menu bar.
-async function locate(labels, near) {
+// `exclude` = rectangles (screen points) where OpenPath itself is drawn: its
+// circle, answer box and pointer. Text found there is OpenPath's own words.
+const insideAny = (x, y, rects) => (rects || []).some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+
+async function locate(labels, near, exclude) {
   if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
-  const list = (labels || []).filter(Boolean).slice(0, 6);
+  const list = (labels || []).filter(Boolean).slice(0, 40);
   if (!list.length) return { ok: false, reason: "no_labels" };
   let file = null;
   try {
-    const { image, display } = await captureDisplay();
-    file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
-    fs.writeFileSync(file, image.toPNG(), { mode: 0o600 });
-    const res = await runOcr(file, list);
-    if (!res.ok) return res;
+    const display = screen.getPrimaryDisplay();
+    let matches = await helperRead({ labels: list, scale: 2 });
+    let ownWindowsInPicture = false;
+    if (!matches) {
+      const cap = await captureDisplay();
+      file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+      fs.writeFileSync(file, cap.image.toPNG(), { mode: 0o600 });
+      const res = await runOcr(file, list);
+      if (!res.ok) return res;
+      matches = res.matches; ownWindowsInPicture = true;
+    }
+    if (!ownWindowsInPicture) exclude = [];                      // the helper already left OpenPath out
     const W = display.size.width, H = display.size.height;
-    const scored = res.matches.map((m) => {
+    const scored = matches.map((m) => ({ x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, m }))
+      .filter((b) => !insideAny(b.x + b.w / 2, b.y + b.h / 2, exclude))
+      .map(({ m }) => {
       const box = { x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H };
       const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
       let score = 0;
@@ -120,6 +203,75 @@ async function locate(labels, near) {
     }).sort((a, b) => b.score - a.score);
     if (!scored.length) return { ok: false, reason: "not_found" };
     return { ok: true, box: scored[0].box };
+  } catch (err) {
+    return { ok: false, reason: "capture_failed", detail: String(err?.message || err) };
+  } finally {
+    if (file) { try { fs.unlinkSync(file); } catch { /* already gone */ } }
+  }
+}
+
+// Every one of `labels` that is visible, each with its best box. Used to tell
+// which page of a website is showing.
+async function findAll(labels, exclude) {
+  if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
+  const list = (labels || []).filter(Boolean).slice(0, 60);
+  let file = null;
+  try {
+    const display = screen.getPrimaryDisplay();
+    let matches = await helperRead({ labels: list, scale: 1 });
+    if (matches) exclude = [];
+    else {
+      const cap = await captureDisplay();
+      file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+      fs.writeFileSync(file, cap.image.toPNG(), { mode: 0o600 });
+      const res = await runOcr(file, list);
+      if (!res.ok) return res;
+      matches = res.matches;
+    }
+    const W = display.size.width, H = display.size.height, best = new Map();
+    for (const m of matches) {
+      const box = { x: m.x * W, y: m.y * H, w: m.w * W, h: m.h * H, text: m.label };
+      if (insideAny(box.x + box.w / 2, box.y + box.h / 2, exclude)) continue;
+      const score = m.exact ? 2 : m.word ? 1 : 0;
+      if (score < 1) continue;                                  // whole words only for page detection
+      const prev = best.get(m.label);
+      if (!prev || score > prev.score) best.set(m.label, { score, box });
+    }
+    return { ok: true, found: [...best.entries()].map(([label, v]) => ({ label, box: v.box })) };
+  } catch (err) {
+    return { ok: false, reason: "capture_failed", detail: String(err?.message || err) };
+  } finally {
+    if (file) { try { fs.unlinkSync(file); } catch { /* already gone */ } }
+  }
+}
+
+// Every line of text inside `region` (screen points). Used to notice that the
+// screen changed after the person clicked (a menu opened, a tab appeared).
+async function readRegion(region, exclude) {
+  if (process.platform !== "darwin") return { ok: false, reason: "unsupported" };
+  const d = screen.getPrimaryDisplay().bounds;
+  const r = { x: Math.max(0, region.x), y: Math.max(0, region.y) };
+  r.w = Math.min(region.w, d.width - r.x); r.h = Math.min(region.h, d.height - r.y);
+  if (r.w >= 20 && r.h >= 20) {
+    const m = await helperRead({ labels: [], fast: true, scale: 1, rect: r });
+    if (m) return { ok: true, lines: m.map((x) => x.text.trim()).filter(Boolean) };
+  }
+  let file = null;
+  try {
+    const { image, display } = await captureDisplay({ scale: 1 });
+    const sf = 1;
+    const x = Math.max(0, Math.round(region.x * sf)), y = Math.max(0, Math.round(region.y * sf));
+    const w = Math.min(Math.round(region.w * sf), image.getSize().width - x), h = Math.min(Math.round(region.h * sf), image.getSize().height - y);
+    if (w < 20 || h < 20) return { ok: false, reason: "tiny" };
+    const crop = image.crop({ x, y, width: w, height: h });
+    file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+    fs.writeFileSync(file, crop.toPNG(), { mode: 0o600 });
+    const res = await runOcr(file, [], { fast: true });
+    if (!res.ok) return res;
+    const lines = res.matches
+      .filter((m) => !insideAny(region.x + (m.x + m.w / 2) * region.w, region.y + (m.y + m.h / 2) * region.h, exclude))
+      .map((m) => m.text.trim()).filter(Boolean);
+    return { ok: true, lines };
   } catch (err) {
     return { ok: false, reason: "capture_failed", detail: String(err?.message || err) };
   } finally {
@@ -143,6 +295,9 @@ async function snapshotForClaude() {
 
 function isSensitive(title) { return SENSITIVE.test(title || ""); }
 
-function cleanup() { if (scriptFile) { try { fs.unlinkSync(scriptFile); } catch { /* ignore */ } } }
+function cleanup() {
+  if (scriptFile) { try { fs.unlinkSync(scriptFile); } catch { /* ignore */ } }
+  if (helper) { try { helper.kill(); } catch { /* ignore */ } }
+}
 
-module.exports = { locate, snapshotForClaude, isSensitive, cleanup };
+module.exports = { locate, findAll, readRegion, snapshotForClaude, isSensitive, cleanup };

@@ -9,11 +9,26 @@ import { native } from "./bridge.js";
 import { state, logEvent } from "./bus.js";
 import { redact, detectScam, refusalText, scoreText, isSensitiveTitle } from "./guardrails.js";
 import { t } from "./i18n.js";
+import { findGuide } from "./guides.js";
 import { findWorkflow, workflowStep, fallbackText, isAdvance, isRepeat, hasOfflineLanguage } from "./knowledge.js";
 
 let active = null;   // { found, index, lang, screenId }
 
 export function resetWorkflow() { active = null; }
+export function hasActiveGuide() { return !!active; }
+
+// Moves the active built-in guide to its next step (after OpenPath notices
+// the person clicked). Returns null when there is no guide or it has ended.
+export function nextStep() {
+  if (!active) return null;
+  const lang = state.settings.language || "en";
+  if (active.lang !== lang) { active = null; return null; }
+  if (active.index + 1 >= active.total) { active = null; return { done: true }; }
+  const step = workflowStep(active.found, active.index + 1, lang);
+  active.index = step.index;
+  if (step.last) active = null;
+  return { text: step.text, source: "offline", step };
+}
 
 // Shortens a window title for speaking: drops the browser name and trims.
 function friendlyTitle(t) {
@@ -45,7 +60,9 @@ async function liveScreen() {
     windows,
   };
   if (risky.score >= 5) {
-    screen.risk = { scam: true, category: "suspicious_window", cues: risky.reasons.map((r) => `window title shows ${r}`) };
+    const has = (w) => risky.reasons.some((r) => r.includes(w));
+    const category = has("tech support") || has("virus") ? "fake_tech_support" : has("prize") || has("fee") ? "fake_prize" : has("relative") || has("gift") ? "family_emergency" : "suspicious_window";
+    screen.risk = { scam: true, category, cues: risky.reasons.map((r) => `window title shows ${r}`) };
   }
   return screen;
 }
@@ -85,12 +102,16 @@ export async function respond(rawQuery) {
     }
   }
 
+  // ---- 3b. page-aware guides for real websites (Google sign-up) ----
+  const guide = findGuide(query, lang);
+  if (guide) { active = null; return { guide, text: "", source: "offline" }; }
+
   // ---- 4. built-in library ----
   if (hasOfflineLanguage(lang) || !(state.settings.anthropicKey || "").trim()) {
     const found = findWorkflow(query, lang, screen);
     if (found) {
       const step = workflowStep(found, 0, lang);
-      active = step.last ? null : { found, index: 0, lang, screenId: screen?.id || null };
+      active = step.last ? null : { found, index: 0, total: step.total, lang, screenId: screen?.id || null };
       let text = step.text;
       if (verdict.score > 0 && screen?.risk?.scam) {
         // Something suspicious is visible even though the request is benign.
@@ -129,8 +150,8 @@ export async function respond(rawQuery) {
     logEvent({ type: "cost", title: res.cached ? "Answer served from cache" : "Claude answered", detail: res.cached ? "0 tokens" : `${res.usage?.input_tokens || 0} in / ${res.usage?.output_tokens || 0} out tokens` });
     return { text: res.text, source: res.cached ? "cache" : "claude" };
   }
-  if (res.reason === "no_key") logEvent({ type: "warn", title: "No Claude key yet", detail: "Built-in guides only. Add a key in Settings → Keys to answer any question." });
-  if (res.reason === "bad_key") logEvent({ type: "warn", title: "Claude key rejected", detail: "Check the key in Settings → Keys" });
+  if (res.reason === "no_key") logEvent({ type: "warn", title: "Full answers not set up yet", detail: "Built-in guides only. Add an Anthropic API key in Settings → Setup to answer any question." });
+  if (res.reason === "bad_key") logEvent({ type: "warn", title: "AI key not accepted", detail: "Check the key in Settings → Setup" });
   if (res.reason === "rate_limited") logEvent({ type: "warn", title: "Claude is busy", detail: "Using built-in answers for now" });
   if (res.reason === "offline") logEvent({ type: "warn", title: "No internet", detail: "Using built-in answers" });
   if (res.reason === "error") logEvent({ type: "warn", title: "Claude request failed", detail: res.detail || "Unknown error" });
@@ -139,14 +160,15 @@ export async function respond(rawQuery) {
   const found = findWorkflow(query, "en", screen);   // last try: English matching
   if (found) {
     const step = workflowStep(found, 0, lang);
-    active = step.last ? null : { found, index: 0, lang, screenId: screen?.id || null };
+    active = step.last ? null : { found, index: 0, total: step.total, lang, screenId: screen?.id || null };
     return { text: step.text, source: "offline", step };
   }
-  const reason = res.reason === "offline" ? "offline" : res.reason === "no_key" || res.reason === "bad_key" ? "no_key" : null;
-  return { text: fallbackText(lang, screen, { reason, query }), source: "offline", needsKey: reason === "no_key" };
+  const reason = res.reason === "offline" ? "offline" : res.reason === "local_only" ? "local_only" : res.reason === "no_key" || res.reason === "bad_key" ? "no_key" : null;
+  return { text: fallbackText(lang, screen, { reason, query }), source: "offline" };
 }
 
 async function notifyCaregiver(verdict, query, screen) {
+  if (state.settings.localOnly !== false && native.platform === "electron") return;   // nothing leaves this computer
   const url = (state.settings.caregiverWebhook || "").trim();
   if (!/^https:\/\//.test(url)) return;
   try {

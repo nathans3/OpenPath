@@ -153,3 +153,27 @@ body.lab-body { background: var(--lab-bg); color: var(--lab-ink); font-family: v
   .scam-popup { inset: 12px 12px auto; }
 }
 @media (prefers-reduced-motion: reduce) { .lab-root * { animation: none !important; } }
+
+/* bill pay */
+.bp-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bp-title h3 { margin: 0; font-size: 20px; font-family: var(--lab-display); }
+.bp-payees { display: grid; gap: 10px; }
+.bp-payee { display: grid; gap: 2px; text-align: left; background: #fff; border: 1px solid #d7e2da; border-radius: 12px; padding: 14px 16px; color: #1b1b1b; }
+.bp-payee b { font-size: 17px; }
+.bp-payee span { color: #6a7480; font-size: 14px; }
+.bp-payee:hover { border-color: #1e6b43; }
+.bp-form { background: #fff; border: 1px solid #d7e2da; border-radius: 12px; padding: 18px 20px; display: grid; gap: 14px; max-width: 520px; }
+.bp-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bp-amount { display: grid; gap: 6px; font-weight: 700; color: #334; }
+.bp-input { display: flex; align-items: center; gap: 6px; border: 1px solid #b9c5d1; border-radius: 8px; padding: 0 12px; background: #fff; max-width: 220px; }
+.bp-input span { color: #556; font-size: 18px; }
+.bp-input input { border: 0; outline: 0; font: inherit; font-size: 20px; padding: 10px 0; width: 100%; color: #1b1b1b; background: transparent; }
+.bp-error { margin: 0; color: #b3261e; font-weight: 700; }
+.bp-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-green { background: #1e6b43; color: #fff; border: 0; border-radius: 8px; padding: 14px 18px; font-size: 17px; font-weight: 700; }
+.bp-ghost { background: #fff; border: 1px solid #c9d2db; border-radius: 8px; padding: 12px 16px; font-weight: 700; color: #1b1b1b; }
+.bp-done { background: #fff; border: 1px solid #d7e2da; border-radius: 12px; padding: 26px; display: grid; gap: 10px; justify-items: start; max-width: 520px; }
+.bp-done h3 { margin: 0; font-family: var(--lab-display); font-size: 22px; }
+.bp-done p { margin: 0; }
+.bp-check { width: 44px; height: 44px; border-radius: 50%; background: #1e6b43; color: #fff; display: grid; place-items: center; font-size: 24px; font-weight: 700; }
+.bp-conf b { font-family: ui-monospace, Menlo, monospace; font-size: 18px; letter-spacing: .04em; }

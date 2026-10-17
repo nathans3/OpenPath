@@ -35,7 +35,8 @@ export function mountPointer(root) {
     ring.style.left = x + "px"; ring.style.top = y + "px";
     ring.style.width = w + "px"; ring.style.height = h + "px";
 
-    const label = box.text ? `${t(state.settings?.language || "en", "clickHere")}: ${box.text}` : t(state.settings?.language || "en", "clickHere");
+    const L = state.settings?.language || "en";
+    const label = box.tag || (box.text ? `${t(L, "clickHere")}: ${box.text}` : t(L, "clickHere"));
     tag.textContent = label;
     const below = y + h + 56 < v.bottom;
     tag.style.left = Math.max(v.left + 8, Math.min(v.right - 260, x)) + "px";

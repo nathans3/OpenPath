@@ -36,23 +36,7 @@ const SCREENS = {
         <footer class="muted">Questions? Call the clinic at (555) 010-4400</footer>
       </div></div>`,
 
-  bank: () => `
-    <div class="lab-browser"><div class="lab-url">🔒 harborcommunitybank.com/accounts</div>
-      <div class="lab-page bank">
-        <header class="bank-head"><span class="logo">⚓ Harbor Community Bank</span><span>Welcome, Dorothy</span><a href="#" class="signout" data-toast="Signed out (practice).">Sign out</a></header>
-        <div class="bank-cards">
-          <div class="acct"><div class="n">Everyday Checking ····4471</div><div class="bal">$2,318.40</div><div class="muted">Available balance</div></div>
-          <div class="acct"><div class="n">Savings ····9082</div><div class="bal">$11,502.11</div><div class="muted">Available balance</div></div>
-        </div>
-        <div class="bank-actions">
-          <button type="button" data-toast="Transfer screen (practice).">Transfer</button>
-          <button type="button" data-toast="Pay bills: Shoprite, City Electric, Verizon (practice).">Pay bills</button>
-          <button type="button" data-toast="Statements (practice).">Statements</button>
-          <button type="button" data-toast="Deposit check (practice).">Deposit check</button>
-        </div>
-        <h3>Recent activity</h3>
-        <table class="bank-table"><tr><td>Oct 15</td><td>Shoprite</td><td>−$64.22</td></tr><tr><td>Oct 14</td><td>Riverside Pharmacy</td><td>−$18.90</td></tr><tr><td>Oct 12</td><td>City Electric</td><td>−$112.00</td></tr><tr><td>Oct 1</td><td>Social Security deposit</td><td class="pos">+$1,904.00</td></tr></table>
-      </div></div>`,
+  bank: () => bankScreen(),
 
   "scam-popup": () => `
     <div class="lab-browser"><div class="lab-url">⚠ security-alert-0199.win-defender-support.co</div>
@@ -105,6 +89,71 @@ const SCREENS = {
     </div>`,
 };
 
+// ---------- Practice bank: a real bill-pay flow ----------
+// overview → payees → form → review → done. Clicks move between views.
+const bank = { view: "overview", payee: "City Electric", amount: "", error: "" };
+const PAYEES = [
+  { name: "City Electric", last: "Last paid $112.00 on Sep 20" },
+  { name: "Verizon Wireless", last: "Last paid $64.99 on Sep 14" },
+  { name: "Riverside Water", last: "Last paid $38.20 on Sep 2" },
+];
+const money = (v) => "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function bankShell(inner) {
+  return `
+    <div class="lab-browser"><div class="lab-url">🔒 harborcommunitybank.com/${bank.view === "overview" ? "accounts" : "billpay"}</div>
+      <div class="lab-page bank">
+        <header class="bank-head"><span class="logo">⚓ Harbor Community Bank</span><span>Welcome, Dorothy</span><a href="#" class="signout" data-toast="Signed out (practice).">Sign out</a></header>
+        ${inner}
+      </div></div>`;
+}
+
+function bankScreen() {
+  if (bank.view === "payees") return bankShell(`
+    <div class="bp-title"><h3>Pay bills</h3><a href="#" class="link" data-bank="overview">Back to accounts</a></div>
+    <p class="muted">Choose who you want to pay.</p>
+    <div class="bp-payees">${PAYEES.map((p) => `<button type="button" class="bp-payee" data-bank="form" data-payee="${esc(p.name)}"><b>${esc(p.name)}</b><span>${esc(p.last)}</span></button>`).join("")}</div>`);
+  if (bank.view === "form") return bankShell(`
+    <div class="bp-title"><h3>Pay ${esc(bank.payee)}</h3><a href="#" class="link" data-bank="payees">Choose a different company</a></div>
+    <div class="bp-form">
+      <div class="bp-row"><span class="muted">From</span><b>Everyday Checking ····4471 · $2,318.40 available</b></div>
+      <label class="bp-amount">Amount<span class="bp-input"><span>$</span><input type="text" id="lab-amount" inputmode="decimal" placeholder="0.00" value="${esc(bank.amount)}" autocomplete="off"></span></label>
+      ${bank.error ? `<p class="bp-error">${esc(bank.error)}</p>` : ""}
+      <div class="bp-row"><span class="muted">Pay on</span><b>Oct 20, 2026 (earliest date)</b></div>
+      <div class="bp-actions"><button type="button" class="btn-blue" data-bank="review">Review payment</button><button type="button" class="bp-ghost" data-bank="payees">Cancel</button></div>
+    </div>`);
+  if (bank.view === "review") return bankShell(`
+    <div class="bp-title"><h3>Review your payment</h3></div>
+    <div class="bp-form">
+      <div class="bp-row"><span class="muted">To</span><b>${esc(bank.payee)}</b></div>
+      <div class="bp-row"><span class="muted">Amount</span><b>${money(bank.amount)}</b></div>
+      <div class="bp-row"><span class="muted">From</span><b>Everyday Checking ····4471</b></div>
+      <div class="bp-row"><span class="muted">Pay on</span><b>Oct 20, 2026</b></div>
+      <div class="bp-actions"><button type="button" class="btn-green" data-bank="done">Confirm payment</button><button type="button" class="bp-ghost" data-bank="form">Edit</button></div>
+    </div>`);
+  if (bank.view === "done") return bankShell(`
+    <div class="bp-done">
+      <div class="bp-check">✓</div>
+      <h3>Payment scheduled</h3>
+      <p>${money(bank.amount)} to ${esc(bank.payee)} on Oct 20, 2026, from Everyday Checking ····4471.</p>
+      <p class="bp-conf">Confirmation number <b>HCB-48213</b></p>
+      <button type="button" class="bp-ghost" data-bank="overview">Back to accounts</button>
+    </div>`);
+  return bankShell(`
+        <div class="bank-cards">
+          <div class="acct"><div class="n">Everyday Checking ····4471</div><div class="bal">$2,318.40</div><div class="muted">Available balance</div></div>
+          <div class="acct"><div class="n">Savings ····9082</div><div class="bal">$11,502.11</div><div class="muted">Available balance</div></div>
+        </div>
+        <div class="bank-actions">
+          <button type="button" data-toast="Transfer screen (practice).">Transfer</button>
+          <button type="button" data-bank="payees">Pay bills</button>
+          <button type="button" data-toast="Statements (practice).">Statements</button>
+          <button type="button" data-toast="Deposit check (practice).">Deposit check</button>
+        </div>
+        <h3>Recent activity</h3>
+        <table class="bank-table"><tr><td>Oct 15</td><td>Shoprite</td><td>−$64.22</td></tr><tr><td>Oct 14</td><td>Riverside Pharmacy</td><td>−$18.90</td></tr><tr><td>Sep 20</td><td>City Electric</td><td>−$112.00</td></tr><tr><td>Oct 1</td><td>Social Security deposit</td><td class="pos">+$1,904.00</td></tr></table>`);
+}
+
 const MAILS = {
   pharmacy: `<h3>Your prescription is ready for pickup</h3><p class="muted">From Riverside Pharmacy · 9:12 AM</p><p>Hello Dorothy, your prescription for Lisinopril 10 mg is ready at the Main Street pharmacy. Pickup hours are 9 AM to 7 PM.</p>`,
   tommy: `<h3>please help</h3><p class="muted">From Tommy (new number) · tommy.help.2211@mail-fast.ru · 8:40 AM</p><p>Grandma please don't tell mom, I'm in trouble and I need $400 in Google Play gift cards tonight or they won't let me go. Buy them at any store and send me the codes to this email. Please hurry, I love you.</p><p><a href="#" class="link" data-say="My grandson Tommy needs gift cards tonight, how do I buy them?" data-say-es="Mi nieto Tommy necesita tarjetas de regalo esta noche, ¿cómo las compro?" data-say-zh="我孙子汤米今晚需要礼品卡，我怎么买？">How do I buy gift cards?</a></p>`,
@@ -147,12 +196,12 @@ export function mountLab(root, { embedded = false } = {}) {
           <h2>OpenPath is looking at your real screen</h2>
           <p>Switch to any app or website you have open, then tap the glowing circle and ask for help. OpenPath reads the <b>names</b> of your open windows, nothing else, and only after you tap.</p>
           <p class="muted">On a Mac, the first time you ask, macOS may ask to allow OpenPath under <b>Screen Recording</b>. That permission is what lets it read window names. No screenshots are taken.</p>
-          <button type="button" class="lab-real-btn" id="lab-perm">Open Screen Recording settings</button>
+
         </div>`;
-      stage.querySelector("#lab-perm").addEventListener("click", () => native.requestScreenPermission && native.requestScreenPermission());
       native.publishScreen(null);
       return;
     }
+    if (sc.kind === "bank") { bank.view = "overview"; bank.amount = ""; bank.error = ""; }
     stage.innerHTML = SCREENS[sc.kind]();
     stage.className = "lab-stage kind-" + sc.kind;
     native.publishScreen(screenState(sc));
@@ -161,7 +210,22 @@ export function mountLab(root, { embedded = false } = {}) {
 
   function say(text, lang) { native.labSay({ text, lang }); }
 
+  function renderBank() { stage.innerHTML = SCREENS.bank(); wireStage(); }
+
   function wireStage() {
+    stage.querySelectorAll("[data-bank]").forEach((b) => b.addEventListener("click", (e) => {
+      e.preventDefault();
+      const to = b.dataset.bank;
+      if (b.dataset.payee) bank.payee = b.dataset.payee;
+      if (bank.view === "form") bank.amount = (stage.querySelector("#lab-amount")?.value || "").replace(/[^0-9.]/g, "");
+      if (to === "review" && !(Number(bank.amount) > 0)) { bank.error = "Enter the amount to pay."; renderBank(); return; }
+      bank.error = "";
+      if (to === "overview") bank.amount = "";
+      bank.view = to;
+      renderBank();
+    }));
+    const amt = stage.querySelector("#lab-amount");
+    if (amt) amt.addEventListener("input", () => { bank.amount = amt.value.replace(/[^0-9.]/g, ""); });
     stage.querySelectorAll("[data-say]").forEach((b) => b.addEventListener("click", (e) => {
       e.preventDefault();
       say(b.dataset.say, "en");
@@ -199,6 +263,6 @@ export function mountLab(root, { embedded = false } = {}) {
   let toastTimer = null;
   function toast(msg) { const el = root.querySelector("#lab-toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2600); }
 
-  show(isDesktop ? REAL_SCREEN.id : "portal");
+  show(isDesktop ? REAL_SCREEN.id : "bank");
   return { show };
 }

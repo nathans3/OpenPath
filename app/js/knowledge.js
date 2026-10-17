@@ -112,29 +112,41 @@ const W = {
       en: ["pay", "bill", "electric", "electricity", "water bill", "phone bill"],
       es: ["pagar", "factura", "recibo", "luz", "electricidad", "agua"],
       zh: ["付", "交费", "账单", "电费", "水费", "电话费"],
-      hi: ["बिल", "भुगतान", "बिजली", "पानी का बिल", "फ़ोन का बिल", "चुकाना"],
+      hi: ["बिल", "भुगतान", "बिजली", "पानी का बिल", "फ़ोन का बिल", "चुकाना", "भरूँ"],
     },
     screens: ["bank"],
     steps: {
       en: [
-        "Look at the row of buttons under your account cards. Click the one that says Pay bills, the second button from the left.",
-        "You'll see a list of companies you've paid before. Click City Electric.",
-        "Type the amount from your paper bill into the Amount box, then click the green Pay button. Check the amount twice before you click.",
+        "Look at the row of buttons under your account cards. Click Pay bills, the second button from the left.",
+        "You'll see the companies you've paid before. Click City Electric.",
+        "Click the white box under Amount and type the amount from your paper bill. Last month it was 112 dollars.",
+        "Good. Now click the blue button that says Review payment.",
+        "Check that it says City Electric and the right amount. If it all looks right, click the green Confirm payment button.",
+        "That's it, your bill is paid. The confirmation number is on the screen if you'd like to write it down.",
       ],
       es: [
-        "Mire la fila de botones debajo de las tarjetas de sus cuentas. Haga clic en el que dice Pay bills, pagar facturas, el segundo desde la izquierda.",
-        "Verá una lista de compañías a las que ya ha pagado. Haga clic en City Electric.",
-        "Escriba la cantidad de su factura de papel en el cuadro Amount, cantidad, y luego haga clic en el botón verde Pay. Revise la cantidad dos veces antes de hacer clic.",
+        "Mire la fila de botones debajo de las tarjetas de sus cuentas. Haga clic en Pay bills, el segundo botón desde la izquierda.",
+        "Verá las compañías a las que ya ha pagado. Haga clic en City Electric.",
+        "Haga clic en el cuadro blanco debajo de Amount y escriba la cantidad de su factura de papel. El mes pasado fueron 112 dólares.",
+        "Bien. Ahora haga clic en el botón azul que dice Review payment.",
+        "Revise que diga City Electric y la cantidad correcta. Si todo está bien, haga clic en el botón verde Confirm payment.",
+        "Listo, su factura está pagada. El número de confirmación está en la pantalla por si quiere anotarlo.",
       ],
       zh: [
-        "看账户卡片下面那一排按钮。点写着 Pay bills（付账单）的那个，从左边数第二个。",
-        "您会看到以前付过款的公司列表。点 City Electric（市电力公司）。",
-        "把纸质账单上的金额输入 Amount（金额）框，然后点绿色的 Pay（付款）按钮。点之前请再核对一遍金额。",
+        "看账户卡片下面那一排按钮。点 Pay bills（付账单），从左边数第二个。",
+        "您会看到以前付过款的公司。点 City Electric（市电力公司）。",
+        "点 Amount（金额）下面的白色框，输入纸质账单上的金额。上个月是 112 美元。",
+        "很好。现在点写着 Review payment（检查付款）的蓝色按钮。",
+        "确认上面写的是 City Electric，金额也对。如果都没问题，点绿色的 Confirm payment（确认付款）按钮。",
+        "好了，您的账单付完了。屏幕上有确认号码，想记下来的话可以抄下来。",
       ],
       hi: [
-        "खातों के कार्ड के नीचे बटनों की कतार देखिए। Pay bills वाला बटन दबाइए, बाईं ओर से दूसरा।",
-        "आपको उन कंपनियों की सूची दिखेगी जिन्हें आप पहले पैसे दे चुके हैं। City Electric पर क्लिक कीजिए।",
-        "कागज़ के बिल से रकम Amount वाले खाने में लिखिए, फिर हरा Pay बटन दबाइए। दबाने से पहले रकम दो बार जाँच लीजिए।",
+        "खातों के कार्ड के नीचे बटनों की कतार देखिए। Pay bills पर क्लिक कीजिए, बाईं ओर से दूसरा बटन।",
+        "आपको वे कंपनियाँ दिखेंगी जिन्हें आप पहले पैसे दे चुके हैं। City Electric पर क्लिक कीजिए।",
+        "Amount के नीचे वाले सफ़ेद खाने में क्लिक कीजिए और कागज़ के बिल वाली रकम लिखिए। पिछले महीने यह 112 डॉलर थी।",
+        "बहुत अच्छे। अब नीले बटन Review payment पर क्लिक कीजिए।",
+        "देख लीजिए कि उसमें City Electric और सही रकम लिखी है। सब ठीक हो तो हरे बटन Confirm payment पर क्लिक कीजिए।",
+        "हो गया, आपका बिल भर गया। स्क्रीन पर पुष्टि नंबर है, चाहें तो उसे लिख लीजिए।",
       ],
     },
   },
@@ -266,37 +278,34 @@ const W = {
   docs_new_tab: {
     apps: ["google docs", "docs", "document", "documento", "文档", "डॉक्यूमेंट", "डॉक"],
     match: {
-      en: ["new tab", "add a tab", "another tab", "tab"],
-      es: ["nueva pestaña", "pestaña"],
-      zh: ["新标签", "标签页", "标签"],
-      hi: ["नया टैब", "टैब"],
+      en: ["document tab", "new tab", "add a tab", "another tab", "tab"],
+      es: ["pestaña del documento", "nueva pestaña", "pestaña"],
+      zh: ["文档标签", "新标签", "标签页", "标签"],
+      hi: ["डॉक्यूमेंट टैब", "नया टैब", "टैब"],
     },
     screens: null,
     steps: {
       en: [
-        "In your Google Doc, look at the menu words along the top: File, Edit, View, Insert. Click Insert.",
-        "A list drops down. Near the bottom, click Tab. A new tab appears in the panel on the left side of the page.",
-        "To name it, double-click the new tab on the left, type a name, and press Return. If you meant a new browser tab instead, press {mod} and T together.",
+        "On the left side of your document, find the words Document tabs. Click the plus sign to the right of them.",
+        "A new tab appears in the list, already open and ready to type in. To name it, click the three dots next to it and choose Rename.",
       ],
       es: [
-        "En su documento de Google, mire las palabras del menú de arriba: Archivo, Editar, Ver, Insertar. Haga clic en Insertar.",
-        "Se abre una lista. Cerca del final, haga clic en Pestaña. Aparece una pestaña nueva en el panel del lado izquierdo.",
-        "Para ponerle nombre, haga doble clic en la pestaña nueva a la izquierda, escriba el nombre y pulse Intro. Si quería una pestaña nueva del navegador, pulse {mod} y T a la vez.",
+        "En el lado izquierdo del documento, busque las palabras Pestañas del documento. Haga clic en el signo más que está a su derecha.",
+        "Aparece una pestaña nueva en la lista, ya abierta y lista para escribir. Para ponerle nombre, haga clic en los tres puntos a su lado y elija Cambiar nombre.",
       ],
       zh: [
-        "在您的谷歌文档里，看最上面的菜单：文件、修改、查看、插入。点「插入」。",
-        "会弹出一个列表。在靠下的地方点「标签页」。左边的面板里就会出现一个新的标签页。",
-        "想给它起名字，就双击左边的新标签页，输入名字，然后按回车。如果您想要的是浏览器的新标签页，同时按 {mod} 和 T。",
+        "在文档左侧找到「文档标签页」这几个字，点它右边的加号。",
+        "列表里会出现一个新的标签页，已经打开，可以直接输入。想给它起名字，就点它旁边的三个点，然后选「重命名」。",
       ],
       hi: [
-        "अपने Google Doc में सबसे ऊपर मेन्यू के शब्द देखिए: File, Edit, View, Insert. Insert पर क्लिक कीजिए।",
-        "एक सूची खुलेगी। नीचे की तरफ़ Tab पर क्लिक कीजिए। पेज के बाईं ओर वाले पैनल में एक नया टैब दिखेगा।",
-        "उसका नाम रखने के लिए बाईं ओर नए टैब पर दो बार क्लिक कीजिए, नाम लिखिए और Return दबाइए। अगर आपको ब्राउज़र का नया टैब चाहिए था, तो {mod} और T एक साथ दबाइए।",
+        "डॉक्यूमेंट के बाईं ओर Document tabs लिखा देखिए। उसके दाईं ओर वाले प्लस के निशान पर क्लिक कीजिए।",
+        "सूची में एक नया टैब आ जाएगा, जो खुला है और लिखने के लिए तैयार है। उसका नाम रखने के लिए उसके पास के तीन बिंदुओं पर क्लिक करके Rename चुनिए।",
       ],
     },
   },
   docs_new_doc: {
     apps: ["google docs", "docs", "document", "documento", "文档", "डॉक्यूमेंट", "डॉक"],
+    exclude: ["tab", "pestaña", "标签", "टैब"],
     match: {
       en: ["new document", "new doc", "blank document", "start a document"],
       es: ["documento nuevo", "nuevo documento"],
@@ -527,7 +536,8 @@ const TARGETS = {
   portal_login: [["Username"], ["Username"], ["Password"], ["Sign In"], ["Test Results"]],
   portal_forgot: [["Forgot username or password?", "Forgot username"], null],
   bank_balance: [["Everyday Checking"], ["Savings"]],
-  bank_paybill: [["Pay bills"], ["City Electric"], ["Amount"]],
+  // waitFor "text": move on when typing appears, not on the first click.
+  bank_paybill: [["Pay bills"], ["City Electric"], { labels: ["Amount"], waitFor: "text" }, ["Review payment"], ["Confirm payment"], null],
   bank_signout: [["Sign out"]],
   video_camera: [["Start video"], null],
   video_mute: [["Mute"]],
@@ -536,10 +546,20 @@ const TARGETS = {
   email_statement: [["Harbor Community Bank"]],
   open_mail: [["Mail"]],
   call_family: [["FamilyCall"]],
-  docs_new_tab: [["Insert", "Insertar", "插入"], ["Tab", "Pestaña", "标签页"], null],
+  docs_new_tab: [{ labels: ["Document tabs", "Pestañas del documento", "文档标签页"], plusRight: true }, null],
   docs_new_doc: [["File", "Archivo", "文件"], ["New", "Nuevo", "新建"]],
   docs_share: [["Share", "Compartir", "共享"], ["Send", "Enviar", "发送"]],
   gmail_compose: [["Compose", "Redactar", "写邮件"], ["To", "Para", "收件人"], ["Send", "Enviar", "发送"]],
+};
+
+// Said instead of the step when its target is not on screen.
+const MISSING = {
+  docs_new_tab: [{
+    en: "I don't see the Document tabs list yet. Click the small icon with three lines at the top left of the page, just below the File menu, to open it. Then click the plus sign next to Document tabs.",
+    es: "Todavía no veo la lista de pestañas. Haga clic en el iconito de tres líneas arriba a la izquierda, justo debajo del menú Archivo, para abrirla. Luego haga clic en el signo más junto a Pestañas del documento.",
+    zh: "我还没看到「文档标签页」列表。点页面左上角、「文件」菜单下面那个三条横线的小图标把它打开，然后点「文档标签页」旁边的加号。",
+    hi: "मुझे अभी Document tabs की सूची नहीं दिख रही। पेज के ऊपर बाईं ओर, File मेन्यू के ठीक नीचे, तीन लकीरों वाले छोटे निशान पर क्लिक करके उसे खोलिए। फिर Document tabs के पास वाले प्लस पर क्लिक कीजिए।",
+  }, null],
 };
 
 const FALLBACK = {
@@ -548,7 +568,8 @@ const FALLBACK = {
     noScreen: "Tell me in a few words what you'd like to do, and I'll guide you one step at a time.",
     live: (names) => `I can see you have ${names} open. Tell me in a few words what you'd like to do, and I'll guide you one step at a time.`,
     noPermission: "I can't see which windows you have open yet. Ask a family member to allow OpenPath under Screen Recording in System Settings, or just tell me what you're trying to do.",
-    needKey: (front) => `${front ? `I can see you're in "${front}". ` : ""}I don't have a built-in answer for that yet. To answer any question like this, OpenPath needs a Claude key. A family member can add one in Settings, under Keys.`,
+    cantYet: (front) => `${front ? `I can see you're in "${front}". ` : ""}I can't help with that one yet. I can guide you through paying bills, email, video calls and Google Docs.`,
+    needKey: (front) => `${front ? `I can see you're in "${front}". ` : ""}I can't help with that one yet. I can guide you through paying bills, email, video calls and Google Docs. For anything else, ask the person who set me up to finish setup.`,
     offline: "I can't reach the internet right now, so I can only help with the built-in guides. Please try again in a moment.",
   },
   es: {
@@ -556,7 +577,8 @@ const FALLBACK = {
     noScreen: "Dígame en pocas palabras qué quiere hacer y la guío paso a paso.",
     live: (names) => `Veo que tiene abierto ${names}. Dígame en pocas palabras qué quiere hacer y la guío paso a paso.`,
     noPermission: "Todavía no puedo ver qué ventanas tiene abiertas. Pida a un familiar que permita OpenPath en Grabación de pantalla, en Ajustes del Sistema, o dígame qué quiere hacer.",
-    needKey: (front) => `${front ? `Veo que está en "${front}". ` : ""}Todavía no tengo una respuesta incorporada para eso. Para responder cualquier pregunta así, OpenPath necesita una clave de Claude. Un familiar puede ponerla en Ajustes, en Claves.`,
+    cantYet: (front) => `${front ? `Veo que está en "${front}". ` : ""}Todavía no puedo ayudar con eso. Puedo guiarla para pagar facturas, el correo, videollamadas y Google Docs.`,
+    needKey: (front) => `${front ? `Veo que está en "${front}". ` : ""}Todavía no puedo ayudar con eso. Puedo guiarla para pagar facturas, el correo, videollamadas y Google Docs. Para todo lo demás, pida a quien me instaló que termine la configuración.`,
     offline: "Ahora no tengo internet, así que solo puedo ayudar con las guías incorporadas. Inténtelo de nuevo en un momento.",
   },
   zh: {
@@ -564,7 +586,8 @@ const FALLBACK = {
     noScreen: "用几个字告诉我您想做什么，我会一步一步带您做。",
     live: (names) => `我看到您打开了${names}。用几个字告诉我您想做什么，我会一步一步带您做。`,
     noPermission: "我暂时看不到您打开了哪些窗口。请家人在系统设置的「屏幕录制」里允许 OpenPath，或者直接告诉我您想做什么。",
-    needKey: (front) => `${front ? `我看到您正在用「${front}」。` : ""}这个问题我还没有现成的答案。要回答这类问题，OpenPath 需要一个 Claude 密钥，家人可以在「设置」的「密钥」里添加。`,
+    cantYet: (front) => `${front ? `我看到您正在用「${front}」。` : ""}这件事我暂时还帮不上忙。我可以一步步带您付账单、用邮件、视频通话和谷歌文档。`,
+    needKey: (front) => `${front ? `我看到您正在用「${front}」。` : ""}这件事我暂时还帮不上忙。我可以一步步带您付账单、用邮件、视频通话和谷歌文档。其他的事，请帮您安装我的人把设置完成。`,
     offline: "现在连不上网，我只能用内置的指南帮您。请稍后再试。",
   },
   hi: {
@@ -572,7 +595,8 @@ const FALLBACK = {
     noScreen: "कुछ शब्दों में बताइए कि आप क्या करना चाहते हैं, और मैं एक-एक कदम करके बताऊँगी।",
     live: (names) => `मुझे दिख रहा है कि आपने ${names} खोला हुआ है। कुछ शब्दों में बताइए कि आप क्या करना चाहते हैं, मैं एक-एक कदम करके बताऊँगी।`,
     noPermission: "मुझे अभी यह नहीं दिख रहा कि आपने कौन-सी खिड़कियाँ खोली हैं। परिवार के किसी सदस्य से System Settings में Screen Recording के अंदर OpenPath को अनुमति दिलवाइए, या मुझे सीधे बताइए कि आप क्या करना चाहते हैं।",
-    needKey: (front) => `${front ? `मुझे दिख रहा है कि आप "${front}" में हैं। ` : ""}इसका तैयार जवाब अभी मेरे पास नहीं है। ऐसे किसी भी सवाल का जवाब देने के लिए OpenPath को Claude की कुंजी चाहिए। परिवार का कोई सदस्य इसे सेटिंग्स में, कुंजियाँ वाले हिस्से में जोड़ सकता है।`,
+    cantYet: (front) => `${front ? `मुझे दिख रहा है कि आप "${front}" में हैं। ` : ""}इसमें मैं अभी मदद नहीं कर सकती। मैं बिल भरने, ईमेल, वीडियो कॉल और Google Docs में कदम-कदम पर मदद कर सकती हूँ।`,
+    needKey: (front) => `${front ? `मुझे दिख रहा है कि आप "${front}" में हैं। ` : ""}इसमें मैं अभी मदद नहीं कर सकती। मैं बिल भरने, ईमेल, वीडियो कॉल और Google Docs में कदम-कदम पर मदद कर सकती हूँ। बाकी कामों के लिए, जिसने मुझे लगाया है उनसे सेटअप पूरा करवाइए।`,
     offline: "अभी इंटरनेट नहीं मिल रहा, इसलिए मैं सिर्फ़ पहले से तैयार गाइड से मदद कर सकती हूँ। थोड़ी देर में फिर कोशिश कीजिए।",
   },
 };
@@ -620,8 +644,11 @@ export function findWorkflow(query, lang, screen) {
   const q = query.toLowerCase();
   let best = null, bestScore = 0;
   for (const [id, wf] of Object.entries(W)) {
-    if (screen?.live && wf.screens) continue;     // practice-screen scripts never run on the real screen
-    const onScreen = !wf.screens || (screen && wf.screens.includes(screen.id));
+    const front = (screen?.windows?.[0] || "").toLowerCase();
+    const liveOk = wf.liveApps && wf.liveApps.some((a) => front.includes(a));
+    if (screen?.live && wf.screens && !liveOk) continue;     // practice-screen scripts run on the real screen only for their own site
+    if (wf.exclude && wf.exclude.some((w) => q.includes(w))) continue;
+    const onScreen = !wf.screens || (screen && wf.screens.includes(screen.id)) || liveOk;
     const keys = [...(wf.match[L] || []), ...(L !== "en" ? wf.match.en : [])];
     let score = 0;
     for (const k of keys) if (q.includes(k)) score += k.length > 4 ? 2 : 1;
@@ -645,7 +672,9 @@ export function workflowStep(found, index, lang) {
   const steps = found.wf.steps[L];
   const i = Math.min(index, steps.length - 1);
   const target = TARGETS[found.id]?.[i] || null;
-  return { text: steps[i].replaceAll("{mod}", MOD), index: i, total: steps.length, last: i === steps.length - 1, target };
+  const miss = MISSING[found.id]?.[i];
+  const missing = miss ? (miss[L] || miss.en).replaceAll("{mod}", MOD) : null;
+  return { text: steps[i].replaceAll("{mod}", MOD), index: i, total: steps.length, last: i === steps.length - 1, target, missing };
 }
 
 // reason: why no answer was found ("no_key", "offline", or null).
@@ -657,8 +686,10 @@ export function fallbackText(lang, screen, { reason = null, query = "" } = {}) {
     if (!screen.windows?.length) return f.noPermission;
     if (SEE_QUESTION.test(query)) return f.live(screen.windows.slice(0, 3).map(quote).join(L === "zh" ? "、" : ", "));
     if (reason === "offline") return f.offline;
+    if (reason === "local_only") return f.cantYet(screen.windows[0]);
     return f.needKey(screen.windows[0]);
   }
+  if (reason === "local_only") return f.cantYet(null);
   if (reason === "offline") return f.offline;
   if (!screen && reason === "no_key") return f.needKey(null);
   return screen ? f.withScreen(screen.title) : f.noScreen;
@@ -679,6 +710,7 @@ export function allGuideSentences() {
         else set.add(text);
       }
     }
+    for (const list of Object.values(MISSING)) for (const m of list) if (m && m[lang]) set.add(m[lang]);
     for (const k of ["noScreen", "noPermission", "offline"]) set.add(FALLBACK[lang][k]);
     set.add(FALLBACK[lang].needKey(null));
     out[lang] = [...set];

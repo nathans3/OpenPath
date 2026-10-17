@@ -8,10 +8,10 @@ const emit = (name, detail) => bus.dispatchEvent(new CustomEvent(name, { detail 
 const on = (name, cb) => bus.addEventListener(name, (e) => cb(e.detail));
 
 const WEB_DEFAULTS = {
-  language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000,
+  language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000, boxHideSeconds: 15,
   sttProvider: "auto", ttsProvider: "auto",
   anthropicKey: "", elevenLabsKey: "", elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL", openaiKey: "",
-  model: "claude-haiku-5-5", screenPictures: "ask", ttsMonthlyCap: 60000,
+  qualityMode: "best", modelChoice: "", screenPictures: "ask", ttsMonthlyCap: 60000,
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
   account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 15, setupPrice: 29 },
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
@@ -72,6 +72,8 @@ Rules:
 - Often you only know the titles of the open windows. Then rely on what you know about that app's current layout (menu names, where buttons usually are) and say exactly where to look and what to click.
 - If the question could mean two things (for example a browser tab or a tab inside Google Docs), answer the most likely one for the front window and mention the other in a few words.`;
 
+let webWatch = null, webInput = null;
+
 function webBridge() {
   let settings = { ...WEB_DEFAULTS, ...lsGet("openpath-settings", {}) };
   settings.account = { ...WEB_DEFAULTS.account, ...(settings.account || {}), monthlyPrice: WEB_DEFAULTS.account.monthlyPrice, setupPrice: WEB_DEFAULTS.account.setupPrice };
@@ -100,7 +102,8 @@ function webBridge() {
       const apiKey = (settings.anthropicKey || "").trim();
       if (!apiKey) return { ok: false, reason: "no_key" };
       const normalized = query.trim().toLowerCase().replace(/\s+/g, " ");
-      const key = await sha256(JSON.stringify({ v: 2, model: settings.model, language, normalized, screen: screen ? [screen.id, ...(screen.elements || [])] : null, recent: (history || []).slice(-2).map((h) => h.text) }));
+      const model = settings.modelChoice || (settings.qualityMode === "low" ? "claude-haiku-5-5" : "claude-opus-5-5");
+      const key = await sha256(JSON.stringify({ v: 3, model, language, normalized, screen: screen ? [screen.id, ...(screen.elements || [])] : null, recent: (history || []).slice(-2).map((h) => h.text) }));
       if (answerCache[key]) { bump({ cacheHitsLLM: 1 }); return { ok: true, text: answerCache[key], cached: true }; }
       const context = screen ? `Screen the user is looking at: ${screen.title}. Visible elements: ${screen.elements.join("; ")}.` : "Screen context unavailable.";
       const messages = (history || []).slice(-4).map((t) => ({ role: t.role, content: t.text }));
@@ -114,12 +117,14 @@ function webBridge() {
             "x-api-key": apiKey,
             "anthropic-version": "2023-06-01",
             "anthropic-dangerous-direct-browser-access": "true",
+            ...(model === "claude-haiku-5-5" ? {} : { "anthropic-beta": "server-side-fallback-2026-07-01" }),
           },
           body: JSON.stringify({
-            model: settings.model || "claude-haiku-5-5",
-            max_tokens: 160,
+            model,
+            max_tokens: model === "claude-haiku-5-5" ? 160 : 4000,
             system: [{ type: "text", text: WEB_SYSTEM, cache_control: { type: "ephemeral" } }],
             messages,
+            ...(model === "claude-haiku-5-5" ? {} : { output_config: { effort: "low" }, fallbacks: "default" }),
           }),
         });
         if (res.status === 401) return { ok: false, reason: "bad_key" };
@@ -141,7 +146,8 @@ function webBridge() {
       const apiKey = (settings.elevenLabsKey || "").trim();
       if (!apiKey) return { ok: false, reason: "no_key" };
       const voiceId = settings.elevenLabsVoiceId || "EXAVITQu4vr4xnSDxMaL";
-      const key = await sha256(`${voiceId}|${language}|${style}|${text}`);
+      const voiceModel = settings.qualityMode === "low" ? "eleven_flash_v2_5" : "eleven_multilingual_v2";
+      const key = await sha256(`${voiceModel}|${voiceId}|${language}|${style}|${text}`);
       const hit = await dbGet(key);
       if (hit) { bump({ ttsCacheHits: 1 }); return { ok: true, cached: true, audio: hit.audio, mime: "audio/mpeg" }; }
       const month = new Date().toISOString().slice(0, 7);
@@ -151,7 +157,7 @@ function webBridge() {
         const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`, {
           method: "POST",
           headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ text, model_id: "eleven_flash_v2_5", voice_settings: { stability: 0.42, similarity_boost: 0.8, style: style === "warm" ? 0.45 : 0.2, use_speaker_boost: true } }),
+          body: JSON.stringify({ text, model_id: voiceModel, voice_settings: { stability: 0.42, similarity_boost: 0.8, style: style === "warm" ? 0.45 : 0.2, use_speaker_boost: true } }),
         });
         if (res.status === 401) return { ok: false, reason: "bad_key" };
         if (!res.ok) return { ok: false, reason: "error", detail: `ElevenLabs ${res.status}` };
@@ -199,6 +205,7 @@ function webBridge() {
         for (const [i, w] of wanted.entries()) {
           if (!own.includes(w)) continue;
           let score = (own === w ? 100 : own.startsWith(w) ? 60 : 30) - i * 5 - el.querySelectorAll("*").length;
+          if (el.matches("button, a, input, [role=button]")) score += 40;     // ring the whole control, not just its words
           if (near) score -= Math.hypot(r.x + r.width / 2 - near.x, r.y + r.height / 2 - near.y) / 8;
           hits.push({ score, box: { x: r.x, y: r.y, w: r.width, h: r.height, text: labels[i], space: "page" } });
         }
@@ -207,15 +214,51 @@ function webBridge() {
       return hits.length ? { ok: true, box: hits[0].box } : { ok: false, reason: "not_found" };
     },
     async point() { return { ok: false, reason: "web" }; },
+    async findAll() { return { ok: false, reason: "web" }; },
+    // In the web preview the practice screen is on the same page, so a real
+    // click inside the ring is easy to notice.
+    async watchTarget({ id, box, clicks = true }) {
+      if (webWatch) document.removeEventListener("click", webWatch, true);
+      if (webInput) document.removeEventListener("input", webInput, true);
+      webInput = null;
+      if (!clicks) {
+        // A typing step: move on once something has been typed and left for a moment.
+        let timer = null;
+        webInput = (e) => {
+          if (!(e.target instanceof HTMLInputElement)) return;
+          clearTimeout(timer);
+          if (!e.target.value.trim()) return;
+          timer = setTimeout(() => { document.removeEventListener("input", webInput, true); webInput = null; emit("follow:advance", { id, reason: "typed" }); }, 1400);
+        };
+        document.addEventListener("input", webInput, true);
+        return { ok: true, clicks: false, screen: false };
+      }
+      webWatch = (e) => {
+        const pad = 14;
+        const inside = (x, y) => x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad;
+        // The click's position, or (keyboard Enter, assistive tech) the center of the control that was pressed.
+        const el = e.target instanceof Element ? e.target.closest("button, a, input, label, li, [role=button]") : null;
+        const r = el ? el.getBoundingClientRect() : null;
+        const hit = (e.clientX || e.clientY ? inside(e.clientX, e.clientY) : false) || (r ? inside(r.x + r.width / 2, r.y + r.height / 2) : false);
+        if (hit) {
+          document.removeEventListener("click", webWatch, true); webWatch = null;
+          setTimeout(() => emit("follow:advance", { id, reason: "clicked" }), 500);
+        }
+      };
+      document.addEventListener("click", webWatch, true);
+      return { ok: true, clicks: true, screen: false };
+    },
+    async stopWatch() { if (webWatch) { document.removeEventListener("click", webWatch, true); webWatch = null; } if (webInput) { document.removeEventListener("input", webInput, true); webInput = null; } return true; },
+    async followStatus() { return { clicks: true, platform: "web" }; },
+    async requestClickPermission() { return true; },
+    onFollow: (cb) => on("follow:advance", cb),
     async aiAvailable() { return !!(settings.anthropicKey || "").trim(); },
 
     async openLab() { emit("web:openLab"); return true; },
     publishScreen(state) { emit("lab:screen", state); },
     labSay(text) { emit("lab:say", text); },
     publishEvent(evt) { emit("overlay:event", evt); },
-    async openExternal(url) { if (/^https:\/\//.test(url)) window.open(url, "_blank", "noopener"); },
     async screenContext() { return { ok: false, reason: "web" }; },   // a browser page cannot see other windows
-    async requestScreenPermission() { return false; },
     async info() { return { platform: "web", version: "0.1.0", userData: "browser storage" }; },
 
     onScreen: (cb) => on("lab:screen", cb),

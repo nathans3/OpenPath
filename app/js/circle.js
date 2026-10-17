@@ -103,6 +103,25 @@ export function mountCircle(root, handlers) {
   circle.addEventListener("pointercancel", () => { drag = null; });
   circle.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlers.onTap(); } });
 
+  // ---- the answer box fades away when left alone ----
+  // After 15 seconds (Settings → Voice) with no hover, typing, listening, thinking or speaking,
+  // the box fades out. The circle stays; a tap brings the box back.
+  const idleMs = () => { const v = state.settings?.boxHideSeconds; return v === 0 ? 0 : (v || 15) * 1000; };
+  let idleTimer = null, overCard = false;
+  function armIdle() {
+    clearTimeout(idleTimer);
+    if (!isShown(card) || overCard || document.activeElement === input) return;
+    if (["listening", "thinking", "speaking", "locked"].includes(state.status)) return;
+    if (!idleMs()) return;                                   // "Never" in Settings
+    idleTimer = setTimeout(() => { if (!overCard && state.status === "idle" && document.activeElement !== input) { conceal(card); setTimeout(quickLabels, 220); } }, idleMs());
+  }
+  card.addEventListener("pointerenter", () => { overCard = true; clearTimeout(idleTimer); });
+  card.addEventListener("pointerleave", () => { overCard = false; armIdle(); });
+  card.addEventListener("pointermove", () => { if (!overCard) { overCard = true; clearTimeout(idleTimer); } });
+  input.addEventListener("focus", () => clearTimeout(idleTimer));
+  input.addEventListener("blur", armIdle);
+  on("status", armIdle);
+
   // ---- quick menu on hover ----
   let quickTimer = null;
   const showQuick = () => { clearTimeout(quickTimer); if (drag?.moved) return; place(); quickLabels(); quick.classList.add("open"); circle.classList.add("is-hover"); };
@@ -191,9 +210,9 @@ export function mountCircle(root, handlers) {
       if (s !== "idle") api.show();
       place();
     },
-    setTranscript(text, partial = false) {
+    setTranscript(text, partial = false, { plain = false } = {}) {
       const L = lang();
-      you.innerHTML = text ? `${t(L, "youSaid")}: <b>${escapeHtml(text)}</b>${partial ? " …" : ""}` : "";
+      you.innerHTML = !text ? "" : plain ? `<b>${escapeHtml(text)}</b>` : `${t(L, "youSaid")}: <b>${escapeHtml(text)}</b>${partial ? " …" : ""}`;
       place();
     },
     setReply(text, { stepInfo, src, needsKey } = {}) {
@@ -221,7 +240,7 @@ export function mountCircle(root, handlers) {
     },
     center() { const r = circle.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
     showTyping(hint) { reveal(form); input.placeholder = hint || t(lang(), "typePlaceholder"); input.focus(); place(); },
-    show() { reveal(card); place(); quickLabels(); },
+    show() { reveal(card); place(); quickLabels(); armIdle(); },
     hide() { conceal(card); setTimeout(quickLabels, 220); },
     toggle() { isShown(card) ? api.hide() : api.show(); },
     element: circle,

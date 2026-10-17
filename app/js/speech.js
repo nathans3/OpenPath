@@ -35,13 +35,18 @@ export async function detectSttMode() {
   return "local";
 }
 
-// Whisper "base" makes roughly a third fewer word errors than "tiny" and
-// still runs on a laptop. With WebGPU (most Macs and recent PCs) it is fast;
-// otherwise a quantized build runs on the CPU.
-const WHISPER_MODEL = "onnx-community/whisper-base";
+// Best quality: Whisper "small", clearly more accurate on older voices and
+// accents (a one-time download of a few hundred MB). Lowest cost mode keeps
+// the lighter "base" model. Both run on this computer, so both are free.
+// With WebGPU (most Macs and recent PCs) they are fast; otherwise a quantized
+// build runs on the CPU.
+const whisperModel = () => (state.settings?.qualityMode === "low" ? "onnx-community/whisper-base" : "onnx-community/whisper-small");
+let localModelId = null;
 
 async function loadLocalWhisper(onProgress) {
-  if (localPipeline) return localPipeline;
+  const WHISPER_MODEL = whisperModel();
+  if (localPipeline && localModelId === WHISPER_MODEL) return localPipeline;
+  if (localPipeline) { localPipeline = null; }
   if (localLoading) return localLoading;
   localLoading = (async () => {
     const mod = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3/dist/transformers.min.js");
@@ -54,14 +59,14 @@ async function loadLocalWhisper(onProgress) {
         p = await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
           device: "webgpu", dtype: { encoder_model: "fp32", decoder_model_merged: "q4" }, progress_callback,
         });
-        state.sttEngine = "Whisper base (GPU)";
+        state.sttEngine = `Whisper ${WHISPER_MODEL.split("-").pop()} (GPU)`;
       } catch { p = null; }
     }
     if (!p) {
       p = await pipeline("automatic-speech-recognition", WHISPER_MODEL, { dtype: "q8", progress_callback });
-      state.sttEngine = "Whisper base (CPU)";
+      state.sttEngine = `Whisper ${WHISPER_MODEL.split("-").pop()} (CPU)`;
     }
-    localPipeline = p;
+    localPipeline = p; localModelId = WHISPER_MODEL;
     return p;
   })();
   try { return await localLoading; } finally { localLoading = null; }
@@ -318,12 +323,12 @@ export function stopSpeaking() {
   currentUtterance = null;
 }
 
-// Voice order, cheapest good option first:
-//   1. The pre-recorded voice pack (built-in guide sentences, all languages): free.
-//   2. English: Kokoro, a natural neural voice on this computer: free.
-//   3. ElevenLabs, cached by SHA-256 and capped per month: paid.
-//      With "ElevenLabs (premium)" chosen, it is used for English too.
-//   4. The operating system's best voice: free.
+// Voice order.
+//   Best quality (default):  recorded voice pack → ElevenLabs Multilingual v2
+//                            (when a key is set) → Kokoro (English) → system.
+//   Lowest cost:             recorded voice pack → Kokoro (English) →
+//                            ElevenLabs Flash → system.
+// ElevenLabs stays cached by SHA-256 and capped per month in both modes.
 let voicePack = null;
 async function loadVoicePack() {
   if (voicePack) return voicePack;
@@ -343,6 +348,7 @@ export async function speak(text, { onStart, onEnd } = {}) {
   const lang = langInfo(state.settings.language || "en");
   const style = state.settings.voiceStyle || "warm";
   const pref = state.settings.ttsProvider || "auto";
+  const best = state.settings.qualityMode !== "low";
   const hasKey = !!(state.settings.elevenLabsKey || "").trim();
 
   // 1. Voice pack
@@ -351,17 +357,8 @@ export async function speak(text, { onStart, onEnd } = {}) {
     if (clip) { state.ttsMode = "pack"; return playUrl(clip, { onStart, onEnd, rate: state.settings.voiceRate || 0.92 }); }
   }
 
-  // 2. Kokoro for English (unless premium ElevenLabs is chosen)
-  if ((pref === "auto" || pref === "kokoro") && lang.code === "en") {
-    if (!kokoro && !kokoroFailed && !kokoroLoading) warmKokoro();           // start the download for next time
-    if (kokoro) {
-      try { state.ttsMode = "kokoro"; return await speakKokoro(text, { onStart, onEnd }); }
-      catch (e) { logEvent({ type: "warn", title: "Natural voice failed", detail: String(e?.message || e).slice(0, 120) }); }
-    }
-  }
-
-  // 3. ElevenLabs
-  if ((pref === "auto" || pref === "elevenlabs") && hasKey) {
+  const tryEleven = async () => {
+    if (!((pref === "auto" || pref === "elevenlabs") && hasKey)) return null;
     const res = await native.speak({ text, language: lang.code, style });
     if (res.ok) {
       state.ttsMode = "elevenlabs";
@@ -370,9 +367,23 @@ export async function speak(text, { onStart, onEnd } = {}) {
     }
     if (res.reason === "bad_key") logEvent({ type: "warn", title: "ElevenLabs key rejected", detail: "Falling back to the free voice" });
     if (res.reason === "cap") logEvent({ type: "cost", title: "Monthly voice allowance used", detail: "Using the free voice until next month. Change the allowance in Settings → Costs." });
+    return null;
+  };
+  const tryKokoro = async () => {
+    if (!((pref === "auto" || pref === "kokoro") && lang.code === "en")) return null;
+    if (!kokoro && !kokoroFailed && !kokoroLoading) warmKokoro();           // start the download for next time
+    if (!kokoro) return null;
+    try { state.ttsMode = "kokoro"; return await speakKokoro(text, { onStart, onEnd }); }
+    catch (e) { logEvent({ type: "warn", title: "Natural voice failed", detail: String(e?.message || e).slice(0, 120) }); return null; }
+  };
+
+  const order = best ? [tryEleven, tryKokoro] : [tryKokoro, tryEleven];
+  for (const attempt of order) {
+    const played = await attempt();
+    if (played !== null) return played;
   }
 
-  // 4. System voice
+  // Last: the system voice
   state.ttsMode = "system";
   return speakSystem(text, lang, { onStart, onEnd });
 }
@@ -440,9 +451,12 @@ function speakSystem(text, lang, { onStart, onEnd }) {
     const parts = splitSentences(text);
     let i = 0, started = false, cancelled = false;
     const token = {}; currentUtterance = token;
+    // Some systems never report the end of speech; finish anyway after a
+    // generous estimate so OpenPath is never stuck "speaking".
+    const watchdog = setTimeout(() => { if (currentUtterance === token) { cancelled = true; window.speechSynthesis.cancel(); currentUtterance = null; onEnd && onEnd(); resolve(false); } }, 4000 + text.length * 110);
     const next = () => {
       if (currentUtterance !== token) { cancelled = true; }
-      if (cancelled || i >= parts.length) { if (currentUtterance === token) currentUtterance = null; onEnd && onEnd(); return resolve(!cancelled); }
+      if (cancelled || i >= parts.length) { clearTimeout(watchdog); if (currentUtterance === token) currentUtterance = null; onEnd && onEnd(); return resolve(!cancelled); }
       const u = new SpeechSynthesisUtterance(parts[i++]);
       u.lang = lang.bcp;
       u.rate = state.settings.voiceRate || 0.92;

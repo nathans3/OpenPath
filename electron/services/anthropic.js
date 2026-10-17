@@ -1,7 +1,8 @@
 // Instruction engine backed by Claude. The renderer has already redacted
 // sensitive data and run the scam guardrail before anything reaches here.
-// Cost controls: short system prompt, hard max_tokens cap, prompt caching on
-// the stable system prompt, and a small on-disk answer cache keyed by SHA-256.
+// Quality first (Claude Opus 5.5 by default), with cost controls that do not
+// touch quality: a 35-word answer, an on-disk answer cache keyed by SHA-256,
+// prompt caching on the system prompt, and a monthly Opus allowance.
 
 const Anthropic = require("@anthropic-ai/sdk");
 const crypto = require("crypto");
@@ -10,6 +11,39 @@ const path = require("path");
 const { app } = require("electron");
 const store = require("./store");
 const vision = require("./vision");
+
+// ---------- Which model ----------
+// Best quality (default): Claude Opus 5.5, with Anthropic's server-side
+// fallback so a rare safety decline is retried on another model instead of
+// leaving the person without an answer. Lowest cost: Claude Haiku 5.5.
+// A monthly allowance of Opus calls keeps a very heavy user from costing more
+// than the subscription; past it, answers come from Haiku until next month.
+const BEST = "claude-opus-5-5", CHEAP = "claude-haiku-5-5";
+const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
+
+function modelFor(settings) {
+  if (settings.modelChoice) return settings.modelChoice;
+  if (settings.qualityMode === "low") return CHEAP;
+  const month = new Date().toISOString().slice(0, 7);
+  const used = settings.usage?.llmMonth === month ? settings.usage.bestCallsMonth || 0 : 0;
+  return used >= (settings.bestMonthlyCap ?? 600) ? CHEAP : BEST;
+}
+
+function countCall(model) {
+  const u = store.getAll().usage, month = new Date().toISOString().slice(0, 7);
+  const prev = u.llmMonth === month ? u.bestCallsMonth || 0 : 0;
+  store.patch({ usage: { llmMonth: month, bestCallsMonth: prev + (model === CHEAP ? 0 : 1) } });
+}
+
+// Sends a Messages request the way each model needs it.
+async function send(client, body, { effort } = {}) {
+  const model = body.model;
+  if (model === CHEAP) return client.messages.create(body);
+  const output_config = { ...(body.output_config || {}), ...(effort ? { effort } : {}) };
+  const req = { ...body, output_config, max_tokens: Math.max(body.max_tokens, 4000) };   // room for thinking
+  if (FALLBACK_MODELS.has(model)) return client.beta.messages.create({ ...req, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
+  return client.messages.create(req);
+}
 
 const SYSTEM = `You are OpenPath, a patient voice guide for older adults using a computer.
 Rules:
@@ -39,14 +73,14 @@ function writeCache(key, value) {
 }
 
 async function instruct({ query, language, screen, history }, settings) {
-  const { client, apiKey } = makeClient(settings);
-  if (!client) return { ok: false, reason: "no_key" };
+  const { client, apiKey, localOnly } = makeClient(settings);
+  if (!client) return { ok: false, reason: localOnly ? "local_only" : "no_key" };
 
   const normalized = query.trim().toLowerCase().replace(/\s+/g, " ");
   // The cache key covers what is on screen and the last exchange, so "done"
   // in one conversation is never answered with a reply from another.
   const key = cacheKey({
-    v: 2, model: settings.model, language, normalized,
+    v: 3, model: modelFor(settings), language, normalized,
     screen: screen ? [screen.id, ...(screen.elements || [])] : null,
     recent: (history || []).slice(-2).map((h) => h.text),
   });
@@ -68,12 +102,14 @@ async function instruct({ query, language, screen, history }, settings) {
   messages.push({ role: "user", content: `Language: ${language}\n${context}\nUser said: "${query}"` });
 
   try {
-    const response = await client.messages.create({
-      model: settings.model || "claude-haiku-5-5",
+    const model = modelFor(settings);
+    const response = await send(client, {
+      model,
       max_tokens: 160,
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages,
-    });
+    }, { effort: "low" });
+    countCall(model);
 
     if (response.stop_reason === "refusal") {
       return { ok: false, reason: "refusal" };
@@ -119,6 +155,7 @@ function hasProfile() {
   try { return fs.existsSync(path.join(require("os").homedir(), ".config", "anthropic")); } catch { return false; }
 }
 function makeClient(settings) {
+  if (settings.localOnly !== false) return { client: null, apiKey: "", localOnly: true };   // nothing leaves this computer
   const apiKey = (settings.anthropicKey || process.env.ANTHROPIC_API_KEY || "").trim();
   if (!apiKey && !process.env.ANTHROPIC_AUTH_TOKEN && !hasProfile()) return { client: null, apiKey };
   try { return { client: apiKey ? new Anthropic({ apiKey }) : new Anthropic(), apiKey }; } catch { return { client: null, apiKey }; }
@@ -127,8 +164,8 @@ function makeClient(settings) {
 function available(settings) { return !!makeClient(settings).client; }
 
 async function point({ query, language, history, frontTitle }, settings) {
-  const { client, apiKey } = makeClient(settings);
-  if (!client) return { ok: false, reason: "no_key" };
+  const { client, apiKey, localOnly } = makeClient(settings);
+  if (!client) return { ok: false, reason: localOnly ? "local_only" : "no_key" };
   if (vision.isSensitive(frontTitle)) return { ok: false, reason: "sensitive" };
 
   let shot;
@@ -144,8 +181,9 @@ async function point({ query, language, history, frontTitle }, settings) {
     ],
   });
 
+  const model = modelFor(settings);
   const base = {
-    model: settings.model || "claude-haiku-5-5",
+    model,
     max_tokens: 400,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages,
@@ -153,12 +191,12 @@ async function point({ query, language, history, frontTitle }, settings) {
 
   let response;
   try {
-    response = await client.messages.create({ ...base, output_config: { format: { type: "json_schema", schema: POINT_SCHEMA } } });
+    response = await send(client, { ...base, output_config: { format: { type: "json_schema", schema: POINT_SCHEMA } } }, { effort: "medium" });
   } catch (err) {
     if (err instanceof Anthropic.BadRequestError) {
       // Older models without structured outputs: ask for JSON in words.
       try {
-        response = await client.messages.create({ ...base, messages: [...messages.slice(0, -1), { role: "user", content: [...messages[messages.length - 1].content, { type: "text", text: 'Reply with only a JSON object: {"say":"…","has_target":true,"target_label":"…","x":0,"y":0}' }] }] });
+        response = await send(client, { ...base, messages: [...messages.slice(0, -1), { role: "user", content: [...messages[messages.length - 1].content, { type: "text", text: 'Reply with only a JSON object: {"say":"…","has_target":true,"target_label":"…","x":0,"y":0}' }] }] }, { effort: "medium" });
       } catch (e2) { return mapError(e2, apiKey); }
     } else return mapError(err, apiKey);
   }
@@ -173,6 +211,7 @@ async function point({ query, language, history, frontTitle }, settings) {
   if (!data || typeof data.say !== "string" || !data.say.trim()) return { ok: false, reason: "empty" };
 
   store.bumpUsage({ llmCalls: 1, llmInputTokens: response.usage?.input_tokens || 0, llmOutputTokens: response.usage?.output_tokens || 0 });
+  countCall(model);
 
   let target = null;
   if (data.has_target && Number.isFinite(data.x) && Number.isFinite(data.y)) {
@@ -197,4 +236,4 @@ function mapError(err, apiKey) {
   return { ok: false, reason: "error", detail: String(err?.message || err) };
 }
 
-module.exports = { instruct, point, available, SYSTEM };
+module.exports = { instruct, point, available, modelFor, SYSTEM };

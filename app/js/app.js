@@ -5,8 +5,9 @@ import { t } from "./i18n.js";
 import { mountCircle } from "./circle.js";
 import { mountSidebar } from "./sidebar.js";
 import { mountPointer } from "./pointer.js";
-import { reveal, conceal, visibleArea } from "./motion.js";
-import { respond, resetWorkflow } from "./engine.js";
+import { detectWords, bestPage, say as sayIn } from "./guides.js";
+import { reveal, conceal, visibleArea, overlayRects } from "./motion.js";
+import { respond, resetWorkflow, nextStep } from "./engine.js";
 import { listen, speak, stopSpeaking, detectSttMode, persistUsage, warmKokoro, warmLocalWhisper } from "./speech.js";
 
 export async function startOverlay(root) {
@@ -42,7 +43,7 @@ export async function startOverlay(root) {
     onText: (text) => handleQuery(text, "typed"),
     onRepeat: () => { if (lastReply) say(lastReply.text); },
     onAddKey: () => sidebar.open("keys"),
-    onClose: () => { stopSpeaking(); pointer.hide(); if (state.status !== "locked") { setStatus("idle"); circle.setStatus("idle"); } },
+    onClose: () => { stopSpeaking(); pointer.hide(); stopWatching(); guideRun = null; if (state.status !== "locked") { setStatus("idle"); circle.setStatus("idle"); } },
   });
   const sidebar = mountSidebar(root);
 
@@ -59,8 +60,12 @@ export async function startOverlay(root) {
     setStatus("listening"); circle.setStatus("listening");
     circle.setTranscript("");
     // brief simulated waveform so the flow reads as speech, not a click
+    // Plain timers, not animation frames: frames pause when the window is in
+    // the background, which would leave the circle stuck on "listening".
     const t0 = performance.now();
-    await new Promise((r) => { const tick = () => { const e = performance.now() - t0; circle.setLevel(0.3 + 0.5 * Math.abs(Math.sin(e / 90))); if (e < 900) requestAnimationFrame(tick); else r(); }; tick(); });
+    const wave = setInterval(() => circle.setLevel(0.3 + 0.5 * Math.abs(Math.sin((performance.now() - t0) / 90))), 60);
+    await new Promise((r) => setTimeout(r, 900));
+    clearInterval(wave);
     circle.setLevel(0);
     handleQuery(text, "lab");
   });
@@ -76,6 +81,7 @@ export async function startOverlay(root) {
     circle.setReply("");
     circle.setTranscript("");
     pointer.hide();
+    stopWatching();
     if (state.sttMode === "typed") { circle.showTyping(); return; }
 
     stopRequested = false;
@@ -113,21 +119,197 @@ export async function startOverlay(root) {
 
   // Points at the thing to click: Claude's spot from a screen picture, or the
   // built-in guide's word found on screen (on this computer).
+  // Points at the thing to click: Claude's spot from a screen picture, or the
+  // built-in guide's word found on screen (on this computer). Then watches
+  // for the click so the next step comes on its own.
+  // Returns { found, missing } so the caller can swap in a "can't see it" line.
+  let watchId = 0;
   async function aim(out) {
     pointer.hide();
+    stopWatching();
     const lang0 = lang();
-    if (out.point) { pointer.show(out.point, circle.center()); state.lastPoint = centerOf(out.point); return; }
-    const labels = out.step?.target;
-    if (!labels || !native.locate) return;
-    const found = await native.locate(labels, state.lastPoint || null);
-    if (lang() !== lang0 || state.status === "listening") return;     // the person moved on
-    if (found?.ok) { pointer.show(found.box, circle.center()); state.lastPoint = centerOf(found.box); }
+    if (out.point) {
+      pointer.show(out.point, circle.center()); state.lastPoint = centerOf(out.point);
+      startWatching(out.point, out);
+      return { found: true };
+    }
+    const target = out.step?.target;
+    if (!target || !native.locate) return { found: false };
+    const labels = Array.isArray(target) ? target : target.labels;
+    const found = await native.locate(labels, state.lastPoint || null, overlayRects());
+    if (lang() !== lang0 || state.status === "listening") return { found: false };    // the person moved on
+    if (!found?.ok) return { found: false, missing: out.step.missing || null };
+    let box = found.box;
+    if (target.plusRight) {
+      // The button is a "+" to the right of the words (Google Docs' Document tabs).
+      const anchorY = box.y + box.h / 2;
+      const plus = await native.locate(["+"], { x: box.x + box.w + 160, y: anchorY }, overlayRects());
+      const pb = plus?.ok ? plus.box : null;
+      if (pb && Math.abs(pb.y + pb.h / 2 - anchorY) < 18 && pb.x > box.x + box.w - 4) box = { ...pb, text: "+" };
+      else box = { ...box, tag: t(lang(), "plusTag") };
+    }
+    pointer.show(box, circle.center()); state.lastPoint = centerOf(box);
+    startWatching(box, out, { clicks: target.waitFor !== "text" });
+    return { found: true };
   }
+
+  function startWatching(box, out, { clicks = true } = {}) {
+    if (!native.watchTarget) return;
+    const id = ++watchId;
+    watching = { id, out };
+    // Wait a moment for the pointer's label so it is part of what is ignored.
+    setTimeout(() => { if (watching?.id === id) native.watchTarget({ id, clicks, exclude: overlayRects(), box: { x: box.x, y: box.y, w: box.w, h: box.h, space: box.space } }).catch(() => {}); }, 300);
+  }
+  function stopWatching() { watching = null; native.stopWatch && native.stopWatch(); }
+  let watching = null;
+
+
+  // ---------- Page-aware guides (Google sign-up) ----------
+  // Reads the screen (on this computer) to find which page of the site is
+  // showing, says that page's step, points at it, and moves on when the page
+  // changes. It only tells and points: it never opens, clicks or types.
+  let guideRun = null;
+  const isRepeatAsk = (q) => /again|repeat|what did you say|otra vez|repita|再说|重复|फिर से|दोबारा/i.test(q);
+
+  async function detectPage(run) {
+    const res = await native.findAll(detectWords(run.guide), overlayRects());
+    if (!res?.ok || !res.found.length) return null;
+    const page = bestPage(run.guide, res.found.map((f) => f.label));
+    if (!page) return null;
+    const head = res.found.find((f) => page.detect.some((d) => d.toLowerCase() === f.label.toLowerCase()))?.box;
+    return { page, head };
+  }
+
+  async function runGuide({ id, guide }) {
+    const run = { id, guide, page: null, head: null, phase: 0, lastWrong: 0, since: Date.now() };
+    guideRun = run;
+    setStatus("thinking"); circle.setStatus("thinking");
+    const hit = await detectPage(run);
+    if (guideRun !== run) return;
+    if (hit) return showGuidePage(run, hit);
+    // Not on Google yet: say how to get there, then watch for the page.
+    const text = sayIn(guide.start, lang());
+    circle.setReply(text, { src: "offline" });
+    state.history.push({ role: "assistant", text, at: Date.now() });
+    say(text);
+    waitForPage(run, null);
+  }
+
+  // Looks for a page of the guide every 0.3 s. If none shows up for a while
+  // and the window in front is not Google, says how to go back.
+  async function waitForPage(run, fromId) {
+    const began = Date.now();
+    while (guideRun === run && Date.now() - began < 10 * 60000) {
+      const hit = await detectPage(run);
+      if (guideRun !== run) return;
+      if (hit && (hit.page.id !== fromId || Date.now() - began > 4000)) return showGuidePage(run, hit, { quiet: hit.page.id === fromId });
+      if (!hit && Date.now() - began > 7000 && Date.now() - run.lastWrong > 30000) {
+        const front = (await native.screenContext())?.windows?.[0] || "";
+        if (guideRun !== run) return;
+        if (!/google|gmail/i.test(front)) {
+          run.lastWrong = Date.now();
+          const text = sayIn(run.guide.wrongPage, lang());
+          pointer.hide();
+          circle.show(); circle.setReply(text, { src: "offline" });
+          say(text);
+        }
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  async function showGuidePage(run, { page, head }, { quiet = false } = {}) {
+    run.page = page; run.head = head; run.phase = 0;
+    const text = sayIn(page.text, lang());
+    circle.show();
+    pointer.hide();
+    if (!quiet) {
+      circle.setTranscript("");
+      circle.setReply(text, { src: "offline" });
+      state.history.push({ role: "assistant", text, at: Date.now() });
+      say(text);                                  // speak while the pointer is found
+    } else { setStatus("idle"); circle.setStatus("idle"); }
+    if (page.done) { guideRun = null; return; }
+    let box = null;
+    if (page.target) {
+      const near = head ? { x: head.x + head.w / 2, y: head.y + head.h + 120 } : null;
+      const f = await native.locate(page.target.labels, near, overlayRects());
+      if (guideRun !== run) return;
+      if (f?.ok) { box = f.box; pointer.show(box, circle.center()); state.lastPoint = centerOf(box); }
+    }
+    const mode = page.watch === "change" ? "text-or-page" : page.target?.then && box ? "text-or-page" : "page";
+    watchGuide(run, box, mode);
+  }
+
+  function watchGuide(run, box, mode) {
+    const id = ++watchId;
+    watching = { id, out: { guide: true }, run };
+    const area = run.head || box;
+    setTimeout(() => {
+      if (watching?.id !== id) return;
+      native.watchTarget({ id, mode, clicks: false, exclude: overlayRects(),
+        box: box ? { x: box.x, y: box.y, w: box.w, h: box.h } : { x: area.x, y: area.y, w: area.w, h: area.h },
+        area: mode === "page" && run.head ? { x: run.head.x, y: run.head.y, w: run.head.w, h: run.head.h } : undefined,
+      }).catch(() => {});
+    }, 300);
+  }
+
+  async function guideFollow(run, evt) {
+    if (guideRun !== run) return;
+    if (evt.reason === "typed" && run.phase === 0 && run.page?.target?.then) {
+      // They typed: move the pointer to Next and watch for the page to change.
+      run.phase = 1;
+      const near = state.lastPoint;
+      const f = await native.locate(run.page.target.then, near, overlayRects());
+      if (guideRun !== run) return;
+      if (f?.ok) { pointer.show(f.box, near); state.lastPoint = centerOf(f.box); }
+      circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
+      watchGuide(run, f?.ok ? f.box : null, "page");
+      say(t(lang(), "nowNext"));
+      return;
+    }
+    // Something changed (a new page, or a menu opened): find out what is showing.
+    pointer.hide();
+    waitForPage(run, run.page?.id);
+  }
+
+  // The person pressed the button (or the screen changed around it): give the
+  // next step without being asked.
+  native.onFollow && native.onFollow(async (evt) => {
+    if (!watching || evt.id !== watching.id || state.status === "locked") return;
+    if (watching.run) { const run = watching.run; watching = null; return guideFollow(run, evt); }
+    const prev = watching.out; watching = null;
+    pointer.hide();
+    // A Claude-guided step: ask Claude what comes next, with a fresh look.
+    if (!prev.step) { if (prev.source === "claude") handleQuery(t(lang(), "clickedNext"), "follow"); return; }
+    const next = nextStep();
+    if (!next || next.done) return finish(t(lang(), "allDone"));
+    {
+      circle.show();
+      circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
+      state.history.push({ role: "assistant", text: next.text, at: Date.now() });
+      lastReply = next;
+      circle.setReply(next.text, { stepInfo: next.step, src: next.source });
+      const aimed = await aim(next);
+      if (!aimed.found && aimed.missing) { next.text = aimed.missing; circle.setReply(aimed.missing, { stepInfo: next.step, src: next.source }); }
+      await say(next.text);
+    }
+  });
+
+  async function finish(text) {
+    circle.show(); circle.setTranscript(t(lang(), "youClicked"), false, { plain: true });
+    circle.setReply(text, { src: "offline" });
+    await say(text);
+  }
+
   const centerOf = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
   async function handleQuery(text, via) {
     lastQuery = text;
     pointer.hide();
+    stopWatching();
+    if (guideRun && isRepeatAsk(text)) { const pg = guideRun.page; if (pg) { circle.setTranscript(text); return say(sayIn(pg.text, lang())); } }
+    guideRun = null;
     circle.show();
     circle.setTranscript(text);
     state.history.push({ role: "user", text, at: Date.now() });
@@ -158,9 +340,13 @@ export async function startOverlay(root) {
       await say(out.text);
       return;
     }
+    if (out.guide) { state.history.pop(); return runGuide(out.guide); }
     if (!out.step) state.lastPoint = null;   // a new question starts fresh
     circle.setReply(out.text, { stepInfo: out.step, src: out.source, needsKey: out.needsKey });
-    aim(out);
+    // Find the button first (about a second), so a guide whose button is not
+    // on screen can say how to get there instead.
+    const aimed = await aim(out);
+    if (!aimed.found && aimed.missing) { out.text = aimed.missing; circle.setReply(aimed.missing, { stepInfo: out.step, src: out.source }); }
     await say(out.text);
     persistUsage();
   }

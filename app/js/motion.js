@@ -41,3 +41,16 @@ export function toClient(box) {
   if (box.space === "page") return box;
   return { ...box, x: box.x - window.screenX, y: box.y - window.screenY };
 }
+
+// Rectangles (screen points) covered by OpenPath's own visible UI, with a
+// margin, so the screen reader can ignore OpenPath's words.
+export function overlayRects() {
+  const sel = [".op-circle", ".op-card:not([hidden])", ".op-quick.open", "#op-sidebar.open", "#op-lock:not([hidden])", ".op-pointer-layer:not([hidden]) .op-tag"];
+  const out = [];
+  for (const el of document.querySelectorAll(sel.join(","))) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    out.push({ x: r.x + window.screenX - 6, y: r.y + window.screenY - 6, w: r.width + 12, h: r.height + 12 });
+  }
+  return out;
+}

@@ -11,16 +11,22 @@ const store = require("./store");
 
 const CACHE_DIR = () => path.join(app.getPath("userData"), "cache", "tts");
 
-function keyFor({ text, voiceId, language, style }) {
-  return crypto.createHash("sha256").update(`${voiceId}|${language}|${style}|${text}`).digest("hex");
+// Best quality: Multilingual v2, ElevenLabs' most natural voice model.
+// Lowest cost: Flash v2.5, about half the price.
+const voiceModel = (settings) => (settings.qualityMode === "low" ? "eleven_flash_v2_5" : "eleven_multilingual_v2");
+
+function keyFor({ text, voiceId, language, style, model }) {
+  return crypto.createHash("sha256").update(`${model}|${voiceId}|${language}|${style}|${text}`).digest("hex");
 }
 
 async function synthesize({ text, language, style }, settings) {
+  if (settings.localOnly !== false) return { ok: false, reason: "local_only" };   // nothing leaves this computer
   const apiKey = (settings.elevenLabsKey || process.env.ELEVENLABS_API_KEY || "").trim();
   if (!apiKey) return { ok: false, reason: "no_key" };
   const voiceId = settings.elevenLabsVoiceId || "EXAVITQu4vr4xnSDxMaL";
 
-  const key = keyFor({ text, voiceId, language, style });
+  const model = voiceModel(settings);
+  const key = keyFor({ text, voiceId, language, style, model });
   const file = path.join(CACHE_DIR(), key + ".mp3");
   const month = new Date().toISOString().slice(0, 7);
   const used = settings.usage.ttsMonth === month ? settings.usage.ttsCharsMonth || 0 : 0;
@@ -36,7 +42,7 @@ async function synthesize({ text, language, style }, settings) {
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         text,
-        model_id: "eleven_flash_v2_5",   // cheapest multilingual model, low latency
+        model_id: model,
         // Lower stability + a little style = more natural intonation; speaker boost adds presence.
         voice_settings: { stability: 0.42, similarity_boost: 0.8, style: style === "warm" ? 0.45 : 0.2, use_speaker_boost: true },
       }),
