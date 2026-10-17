@@ -304,7 +304,11 @@ export async function startOverlay(root) {
       watchField(run, page, step, f.box);                                  // the box holds a value
       watchGuide(run, f.box, "keys", null, { enter: true });               // or Enter is pressed
     }
-    else if (f?.ok) watchGuide(run, f.box, step.pick ? "value" : "text-or-page", step.pick, { pickClicks: !!step.pick });
+    else if (f?.ok && step.pick) {
+      if (native.readRegion) watchField(run, page, step, f.box);           // the box shows a choice and its list is closed
+      watchGuide(run, f.box, "value", step.pick, { pickClicks: true });   // or: a click on the box, then on a choice
+    }
+    else if (f?.ok) watchGuide(run, f.box, "text-or-page");
     else run.stepTimer = setTimeout(() => { if (guideRun === run && run.page === page) pointAtStep(run, page, near); }, 800);   // not on screen yet: look again
   }
 
@@ -348,8 +352,17 @@ export async function startOverlay(root) {
   // What a text box holds, read from the box itself: its lines minus its own
   // label (which floats above the text once something is typed). "" = empty.
   const normLine = (x) => x.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim();
+  const PICK_WORDS = {
+    month: /^(january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)$/,
+    gender: /^(female|male|rather not say|custom|woman|man|mujer|hombre|prefiero no decirlo|personalizado)$/,
+  };
   async function fieldValue(step, box) {
     const r = { x: box.x - 12, y: box.y - 8, w: Math.max(box.w + 120, 150), h: box.h + 36 };
+    if (step.pick && PICK_WORDS[step.pick]) {
+      // A list box: while its list is open, several choices show below it.
+      const below = await native.readRegion({ x: box.x - 40, y: box.y - 8, w: Math.max(box.w + 260, 300), h: box.h + 320 }).catch(() => null);
+      if (below?.ok && below.lines.map(normLine).filter((x) => PICK_WORDS[step.pick].test(x)).length >= 2) return "";
+    }
     const res = await native.readRegion(r).catch(() => null);
     if (!res?.ok) return null;
     const labels = step.labels.map(normLine);
