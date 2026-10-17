@@ -43,8 +43,17 @@ OpenPath answers with Claude.
 - The Google sign-up guide and the other built-in guides answer instantly without calling Claude.
 - Add the Claude key once in Settings → Setup. Without a key, only the built-in guides answer.
 - Listening (Whisper), the voice (Kokoro, or the computer's own voice for Chinese), reading the screen, pointing and scam protection run on this computer.
-- Before any words go to Claude, passwords, card numbers and other private details are removed. Claude sees a picture of the screen only with permission, never on bank, health or password pages, and pictures are never saved.
-- OpenPath's windows download only their own parts (speech models, libraries, fonts) and the caregiver alert. Everything else from the windows is blocked.
+- To talk, tap the circle or press **Ctrl+O** from any app. Press it again to stop.
+
+## Privacy and security
+
+- **Where data goes:** only to Claude (api.anthropic.com), and only after passwords, card numbers, codes and other private details are removed, including from earlier questions in the conversation. The app blocks every other connection, both from its windows and from its main process.
+- **The microphone** turns on only after a tap or Ctrl+O and stops on its own. Speech is turned into words on the computer and never saved or sent.
+- **Screen pictures** go to Claude only with permission, never on bank, health or password pages, and are never saved.
+- **What is stored:** settings in `openpath-settings.json`, with the Claude key encrypted by the operating system (Keychain on Mac, DPAPI on Windows), plus downloaded speech models. Conversations and answers stay in memory and disappear when OpenPath quits.
+- **Delete all my data** in Settings → Setup removes everything personal from the computer.
+- **App hardening:** windows run sandboxed with no Node access, may only use the microphone, cannot open pop-ups or leave the app's own pages, and never receive the Claude key.
+- See `electron/services/privacy.js` for the guards.
 
 ## Speed
 
@@ -86,7 +95,7 @@ app/
 ### Guardrails that are always on
 
 - **Screen awareness, titles only:** with no practice screen picked, each question reads the titles of open windows (redacted on the device). No screenshots, nothing in the background.
-- **Consent:** the microphone only opens after a deliberate tap and closes by itself after a pause (adjustable 1.2–4.5 s) or 20 s. Nothing streams in the background.
+- **Consent:** the microphone only opens after a deliberate tap or Ctrl+O and closes by itself after a pause (adjustable 1.2–4.5 s) or 20 s. Nothing streams in the background.
 - **Redaction before anything leaves the device:** passwords, Social Security numbers, card numbers (Luhn-checked), account numbers, one-time codes, dates of birth and emails are replaced with placeholders. Logged in History so a caregiver can see it happened.
 - **Scam interception:** the user's words and the on-screen cues are scored for fake tech support, prizes, gift cards, wire transfers, remote access, government threats, urgency and secrecy. Above the threshold the circle and sidebar lock red, OpenPath refuses, and an alert is logged and optionally POSTed to a caregiver webhook (Zapier, IFTTT, your server).
 - **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Claude Haiku first, Sonnet only when needed. The Costs tab shows the running estimate.

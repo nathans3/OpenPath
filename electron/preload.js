@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("openpathNative", {
 
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
+  deleteAllData: () => ipcRenderer.invoke("privacy:deleteAll"),
 
   instruct: (payload) => ipcRenderer.invoke("ai:instruct", payload),
   point: (payload) => ipcRenderer.invoke("ai:point", payload),
@@ -22,6 +23,7 @@ contextBridge.exposeInMainWorld("openpathNative", {
   offlineStats: () => ipcRenderer.invoke("offline:stats"),
   requestClickPermission: () => ipcRenderer.invoke("follow:permission"),
   onFollow: (cb) => ipcRenderer.on("follow:advance", (_e, evt) => cb(evt)),
+  onHotkey: (cb) => ipcRenderer.on("hotkey:talk", () => cb()),
   transcribe: (payload) => ipcRenderer.invoke("stt:transcribe", payload),
 
   openLab: () => ipcRenderer.invoke("lab:open"),

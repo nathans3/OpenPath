@@ -1,5 +1,7 @@
 // Tiny JSON settings store in the app's userData folder. No native deps.
-const { app } = require("electron");
+// The Claude key is encrypted with the operating system's own protection
+// (macOS Keychain, Windows DPAPI) before it is written to disk.
+const { app, safeStorage } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -15,7 +17,6 @@ const DEFAULTS = {
   sttProvider: "auto",          // auto | local | openai | typed
   ttsProvider: "auto",          // auto (Kokoro for English, computer voices otherwise) | kokoro | system
   anthropicKey: "",
-  openaiKey: "",
   qualityMode: "best",          // best | low
   modelChoice: "",              // "" = follow qualityMode; or a specific Claude model id
   bestMonthlyCap: 300,          // expert (Sonnet) answers per month; then Haiku's answer stands
@@ -34,8 +35,16 @@ const DEFAULTS = {
   usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, sttSeconds: 0, cacheHitsLLM: 0, llmMonth: "", bestCallsMonth: 0 },
 };
 
+function canEncrypt() { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } }
+
 function readRaw() {
-  try { return JSON.parse(fs.readFileSync(FILE(), "utf8")); } catch { return {}; }
+  let raw;
+  try { raw = JSON.parse(fs.readFileSync(FILE(), "utf8")); } catch { return {}; }
+  if (raw.anthropicKeyEnc) {
+    try { raw.anthropicKey = safeStorage.decryptString(Buffer.from(raw.anthropicKeyEnc, "base64")); } catch { raw.anthropicKey = ""; }
+  }
+  delete raw.anthropicKeyEnc;
+  return raw;
 }
 
 function getAll() {
@@ -44,6 +53,7 @@ function getAll() {
   const account = { ...DEFAULTS.account, ...(raw.account || {}), monthlyPrice: DEFAULTS.account.monthlyPrice, setupPrice: DEFAULTS.account.setupPrice };
   const merged = { ...DEFAULTS, ...raw, account, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
   delete merged.localOnly;                 // local-only mode was removed; OpenPath always answers with Claude
+  delete merged.openaiKey;                 // cloud listening was removed; listening stays on this computer
   if (!merged.account.trialStartedAt) {
     merged.account.trialStartedAt = new Date().toISOString();
     write(merged);
@@ -54,7 +64,13 @@ function getAll() {
 function write(obj) {
   try {
     fs.mkdirSync(path.dirname(FILE()), { recursive: true });
-    fs.writeFileSync(FILE(), JSON.stringify(obj, null, 2));
+    const out = { ...obj };
+    delete out.hasAnthropicKey;
+    if (out.anthropicKey && canEncrypt()) {
+      out.anthropicKeyEnc = safeStorage.encryptString(out.anthropicKey).toString("base64");
+      delete out.anthropicKey;
+    }
+    fs.writeFileSync(FILE(), JSON.stringify(out, null, 2), { mode: 0o600 });
   } catch (e) { console.error("settings write failed", e); }
 }
 

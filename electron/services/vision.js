@@ -17,6 +17,7 @@ const { desktopCapturer, screen } = require("electron");
 const { execFile } = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
+const privacy = require("./privacy");
 const os = require("os");
 const path = require("path");
 
@@ -70,7 +71,7 @@ function run(argv) {
 let scriptFile = null;
 function ocrScriptPath() {
   if (scriptFile && fs.existsSync(scriptFile)) return scriptFile;
-  scriptFile = path.join(os.tmpdir(), `openpath-ocr-${process.pid}.js`);
+  scriptFile = path.join(privacy.tempDir(), `openpath-ocr-${process.pid}.js`);
   fs.writeFileSync(scriptFile, OCR_SCRIPT, { mode: 0o600 });
   return scriptFile;
 }
@@ -181,7 +182,7 @@ async function locate(labels, near, exclude) {
     let ownWindowsInPicture = false;
     if (!matches) {
       const cap = await captureDisplay();
-      file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+      file = path.join(privacy.tempDir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
       fs.writeFileSync(file, cap.image.toPNG(), { mode: 0o600 });
       const res = await runOcr(file, list);
       if (!res.ok) return res;
@@ -222,7 +223,7 @@ async function findAll(labels, exclude) {
     if (matches) exclude = [];
     else {
       const cap = await captureDisplay();
-      file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+      file = path.join(privacy.tempDir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
       fs.writeFileSync(file, cap.image.toPNG(), { mode: 0o600 });
       const res = await runOcr(file, list);
       if (!res.ok) return res;
@@ -296,7 +297,7 @@ async function readRegion(region, exclude) {
     const w = Math.min(Math.round(region.w * sf), image.getSize().width - x), h = Math.min(Math.round(region.h * sf), image.getSize().height - y);
     if (w < 20 || h < 20) return { ok: false, reason: "tiny" };
     const crop = image.crop({ x, y, width: w, height: h });
-    file = path.join(os.tmpdir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
+    file = path.join(privacy.tempDir(), `openpath-${crypto.randomBytes(6).toString("hex")}.png`);
     fs.writeFileSync(file, crop.toPNG(), { mode: 0o600 });
     const res = await runOcr(file, [], { fast: true });
     if (!res.ok) return res;

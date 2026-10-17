@@ -10,7 +10,7 @@ const on = (name, cb) => bus.addEventListener(name, (e) => cb(e.detail));
 const WEB_DEFAULTS = {
   language: "en", voiceRate: 0.92, voiceStyle: "warm", autoSilenceMs: 2200, maxListenMs: 20000, boxHideSeconds: 15,
   sttProvider: "auto", ttsProvider: "auto",
-  anthropicKey: "", openaiKey: "",
+  anthropicKey: "",
   qualityMode: "best", modelChoice: "", screenPictures: "ask",
   caregiverName: "", caregiverPhone: "", caregiverWebhook: "",
   account: { plan: "trial", trialStartedAt: null, setupPaid: false, monthlyPrice: 7.99, setupPrice: 29 },
@@ -106,23 +106,7 @@ function webBridge() {
       }
     },
 
-    async transcribe({ audioBase64, mime, language, durationSec }) {
-      const apiKey = (settings.openaiKey || "").trim();
-      if (!apiKey) return { ok: false, reason: "no_key" };
-      try {
-        const bytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
-        const form = new FormData();
-        form.append("file", new Blob([bytes], { type: mime || "audio/webm" }), "speech.webm");
-        form.append("model", "whisper-1");
-        if (language && language !== "auto") form.append("language", language);
-        const res = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${apiKey}` }, body: form });
-        if (res.status === 401) return { ok: false, reason: "bad_key" };
-        if (!res.ok) return { ok: false, reason: "error", detail: `Whisper ${res.status}` };
-        const data = await res.json();
-        bump({ sttSeconds: Math.round(durationSec || 0) });
-        return { ok: true, text: (data.text || "").trim() };
-      } catch (e) { return { ok: false, reason: "offline", detail: String(e?.message || e) }; }
-    },
+    async transcribe() { return { ok: false, reason: "local_only" }; },   // listening stays on this computer
 
     // The web preview cannot see other windows, but it can point at the
     // practice screen on the same page by searching its text.
@@ -187,6 +171,7 @@ function webBridge() {
     async requestClickPermission() { return true; },
     onFollow: (cb) => on("follow:advance", cb),
     async aiAvailable() { return !!(settings.anthropicKey || "").trim(); },
+    async deleteAllData() { try { localStorage.clear(); } catch { /* blocked */ } location.reload(); return true; },
 
     async openLab() { emit("web:openLab"); return true; },
     publishScreen(state) { emit("lab:screen", state); },

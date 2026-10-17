@@ -33,6 +33,7 @@ export function mountSidebar(root) {
   const PANELS = {
     voice: (lang) => `
       <p class="op-help">OpenPath answers with Claude: Haiku 5.5 first, and Sonnet 5.5 when a question is hard. It needs a Claude key, added once in the Setup tab. The Google sign-up guide is built in and answers instantly.</p>
+      <p class="op-help"><b>To talk:</b> tap the circle or press <b>Ctrl+O</b> from any app. Press it again to stop.</p>
       <div class="op-status-line">
         <span class="op-chip ${state.sttMode === "typed" ? "warn" : "ok"}">🎙 ${sttLabel()}</span>
         <span class="op-chip ${state.ttsMode === "kokoro" ? "ok" : ""}">🔊 ${state.ttsMode === "kokoro" ? "Natural voice (on this computer)" : "Computer voice"}</span>
@@ -112,12 +113,12 @@ export function mountSidebar(root) {
     },
 
     keys: () => `
-      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath answers questions with Claude, so it needs a Claude key. Only the built-in guides work without one. Keys stay on this computer${isDesktop ? " in the app's settings file" : " in this browser"}.</p>
-      <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="${esc(s().anthropicKey)}" placeholder="sk-ant-…" autocomplete="off">
+      <p class="op-help"><b>For the family member or helper who installs OpenPath.</b> OpenPath answers questions with Claude, so it needs a Claude key. Only the built-in guides work without one. Keys stay on this computer${isDesktop ? ", encrypted by the operating system, and are never shown again after saving" : " in this browser"}.</p>
+      <div class="op-field"><label for="op-k-anthropic">Claude (Anthropic) API key</label><input type="password" id="op-k-anthropic" value="" placeholder="${s().hasAnthropicKey || s().anthropicKey ? "Saved and encrypted on this computer" : "sk-ant-…"}" autocomplete="off">
         <p class="op-help">This is what lets OpenPath answer any question about any app. Create one at console.anthropic.com under API keys, paste it here, and press Save keys.</p></div>
       <div class="op-field"><label for="op-model">Claude model</label>
         <select id="op-model">
-          ${[["", "Automatic: Haiku 5.5 first, Sonnet 5.5 for hard questions"], ["claude-fable-5-1", "Claude Fable 5.1: the most capable, slowest and most expensive"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
+          ${[["", "Automatic: Haiku 5.5 first, Sonnet 5.5 for hard questions"], ["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]].map(([v, l]) => `<option value="${v}" ${(s().modelChoice || "") === v ? "selected" : ""}>${l}</option>`).join("")}
         </select></div>
       <div class="op-field"><label for="op-pics">Pointing with screen pictures</label>
         <select id="op-pics">
@@ -126,14 +127,19 @@ export function mountSidebar(root) {
           <option value="off" ${s().screenPictures === "off" ? "selected" : ""}>Never send pictures</option>
         </select>
         <p class="op-help">For questions the built-in guides do not cover, Claude can look at a picture of your screen to point at the right button. Built-in guides point using your computer's own text reader, which never leaves this computer.</p></div>
-      <button class="op-btn primary" type="button" id="op-save-keys">Save keys</button>
+      <div class="op-row" style="gap:8px;flex-wrap:wrap"><button class="op-btn primary" type="button" id="op-save-keys">Save keys</button>${s().hasAnthropicKey || s().anthropicKey ? `<button class="op-btn" type="button" id="op-forget-key">Forget key</button>` : ""}</div>
       <div class="op-field"><span class="lbl">Privacy and consent</span>
         <ul class="op-help" style="padding-left:18px">
-          <li>Audio is captured only after a deliberate tap, and stops on its own.</li>
+          <li>The microphone turns on only when you tap the circle or press Ctrl+O, and stops on its own. It never listens in the background.</li>
+          <li>Your voice is turned into words on this computer. Recordings are never saved or sent anywhere.</li>
           <li>Passwords, Social Security numbers, card and account numbers, one-time codes, dates of birth and emails are removed on this computer before any text goes to Claude.</li>
-          <li>With local Whisper (default on desktop) your voice never leaves this computer.</li>
+          <li>Only Claude (Anthropic) receives your words, and only after private details are removed. OpenPath blocks every other connection.</li>
+          <li>Conversations live in memory and disappear when OpenPath quits. The Claude key is encrypted on this computer.</li>
           <li>Window names are read only after you tap. Screen pictures for Claude need your permission, are skipped on bank, health and password pages, and are never saved. Built-in pointing reads the screen with your computer's own text reader and nothing leaves the computer.</li>
         </ul></div>
+      <div class="op-field"><span class="lbl">Delete all my data</span>
+        <p class="op-help">Removes settings, the Claude key, caregiver details and usage counts from this computer, then restarts OpenPath. Downloaded speech models stay; they hold nothing personal.</p>
+        <button class="op-btn" type="button" id="op-delete-all">Delete all my data</button> <span id="op-delete-status" class="op-help"></span></div>
       ${isDesktop ? "" : `<p class="op-help">In the shared web preview, outside services are blocked by the page sandbox, so keys only take effect in the desktop app or when you run the web build yourself.</p>`}`,
 
     history: () => `
@@ -214,9 +220,17 @@ export function mountSidebar(root) {
     $("#op-setup")?.addEventListener("click", async () => { await saveSettings({ account: { setupPaid: true } }); logEvent({ type: "cost", title: "Setup fee paid", detail: `$${s().account.setupPrice} one-time (simulated checkout)` }); render(); });
 
     $("#op-save-keys")?.addEventListener("click", async () => {
-      await saveSettings({ anthropicKey: $("#op-k-anthropic").value.trim(), modelChoice: $("#op-model").value });
-      logEvent({ type: "cost", title: "Keys saved", detail: s().anthropicKey ? "Claude" : "No Claude key: only built-in guides will answer" });
+      const typed = $("#op-k-anthropic").value.trim();
+      await saveSettings({ ...(typed ? { anthropicKey: typed } : {}), modelChoice: $("#op-model").value });
+      logEvent({ type: "cost", title: "Keys saved", detail: s().hasAnthropicKey || s().anthropicKey ? "Claude key saved" : "No Claude key: only built-in guides will answer" });
       render();
+    });
+    $("#op-forget-key")?.addEventListener("click", async () => { await saveSettings({ forgetKey: true, anthropicKey: "" }); logEvent({ type: "cost", title: "Claude key removed" }); render(); });
+    $("#op-delete-all")?.addEventListener("click", async () => {
+      const st = $("#op-delete-status");
+      if (st.dataset.armed !== "1") { st.dataset.armed = "1"; st.textContent = "Press again to delete everything."; return; }
+      st.textContent = "Deleting…";
+      await native.deleteAllData();
     });
     $("#op-clear-hist")?.addEventListener("click", () => { state.history.length = 0; state.events.length = 0; render(); });
   }

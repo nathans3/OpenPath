@@ -8,6 +8,7 @@ import { mountPointer } from "./pointer.js";
 import { detectWords, bestPage, stepsOf, say as sayIn } from "./guides.js";
 import { reveal, conceal, visibleArea, overlayRects } from "./motion.js";
 import { respond, resetWorkflow, nextStep } from "./engine.js";
+import { redact } from "./guardrails.js";
 import { listen, speak, stopSpeaking, detectSttMode, persistUsage, warmKokoro, warmLocalWhisper } from "./speech.js";
 
 export async function startOverlay(root) {
@@ -352,7 +353,10 @@ export async function startOverlay(root) {
     guideRun = null;
     circle.show();
     circle.setTranscript(text);
-    state.history.push({ role: "user", text, at: Date.now() });
+    // Only the redacted words are remembered, so earlier questions sent to
+    // Claude as context never carry a password, card number or code.
+    state.history.push({ role: "user", text: redact(text).text, at: Date.now() });
+    if (state.history.length > 40) state.history.splice(0, state.history.length - 40);
     setStatus("thinking"); circle.setStatus("thinking");
 
     const out = await respond(text);
@@ -421,8 +425,12 @@ export async function startOverlay(root) {
   function setIdle() { setStatus("idle"); circle.setStatus("idle"); }
   function lang() { return state.settings.language || "en"; }
 
-  // Keyboard shortcut: space toggles listening when nothing has focus.
+  // Ctrl+O from any app (desktop) starts listening; press again to stop.
+  if (native.onHotkey) native.onHotkey(() => handleTap());
+  // Keyboard shortcuts inside OpenPath's own window: Ctrl+O (also the web
+  // preview), or space when nothing has focus.
   window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && !e.metaKey && !e.altKey && (e.key === "o" || e.key === "O")) { e.preventDefault(); handleTap(); return; }
     if (e.code === "Space" && document.activeElement === document.body) { e.preventDefault(); handleTap(); }
     if (e.key === "Escape") { if (state.status === "listening") stopRequested = true; else if (sidebar.isOpen()) sidebar.close(); }
   });
