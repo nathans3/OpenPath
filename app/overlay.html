@@ -10,7 +10,9 @@
   <div id="op-root"></div>
   <script type="module">
     import { startOverlay } from "./js/app.js";
-    startOverlay(document.getElementById("op-root"));
+    // window.openpath lets teammates (and tests) drive the overlay from DevTools:
+    // openpath.handleQuery("how do i add a new tab to google docs")
+    startOverlay(document.getElementById("op-root")).then((api) => { window.openpath = api; });
   </script>
 </body>
 </html>

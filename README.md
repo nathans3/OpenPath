@@ -1,51 +1,59 @@
 # OpenPath
 
-A floating voice helper for older adults. One glowing circle sits on top of whatever is on the screen. Tap it, say what you are trying to do, and OpenPath answers out loud with one clear step at a time. It speaks English, Spanish, Chinese and Hindi, knows which windows you have open, refuses to help with scams, and tells a family member when it blocks one.
+A floating voice helper for older adults. One glowing circle sits on top of whatever is on the screen. Tap it, say what you are trying to do, and OpenPath answers out loud with one clear step at a time and points at what to click. It runs entirely on your computer, speaks English, Spanish, Chinese and Hindi, and refuses to help with scams.
 
 Desktop app for macOS and Windows (Electron). The same interface also runs in a browser as a web preview.
 
-## Try it in 2 minutes
+## What it does best: signing up for a Google account
 
-**Web preview (nothing to install):** open the GitHub Pages link in the repo's About box, or run it yourself:
+Ask out loud: **"How do I make a Google account?"** OpenPath walks you through Google's real sign-up, on your real screen:
+
+- It recognizes each Google page as it appears: sign-in, "Create account", name, birthday, Gmail address, password, phone check, code, recovery email, review and terms. Google sometimes skips or adds pages, and OpenPath follows whichever one shows.
+- It says one step at a time and points at the box or button with a glowing ring.
+- After you type, the pointer moves to **Next**. When Google shows the next page, OpenPath gives the next step. If you end up on the wrong page, it tells you how to go back.
+- It only tells and points. It never opens, clicks or types anything for you.
+- It works in English, Spanish, Chinese and Hindi.
+
+Other built-in guides: Google Docs (new document tab, new document, share), Gmail (write an email), browser tabs, undo, copy and paste, bigger text, volume. Scam protection locks the screen red on fake virus warnings, prize ads and gift-card requests.
+
+## Install and run
+
+**Mac app:** build it once, then double-click `release/mac-arm64/OpenPath.app`.
 
 ```bash
 npm install
-npm run web      # then open http://localhost:5173
+npx electron-builder --mac dir --arm64 --publish never
 ```
 
-**Desktop app (the real thing, floats over every app):**
+The first time, macOS asks for three permissions. Allow them in System Settings → Privacy & Security:
 
-```bash
-npm install
-npm start
-```
+| Permission | Why |
+|---|---|
+| Microphone | Hears your question after you tap the circle |
+| Screen & System Audio Recording | Reads the screen on this computer to know the page and where to point |
+| Accessibility (optional) | Notices your clicks instantly; without it OpenPath watches the screen instead |
 
-The circle appears on the right side of your screen and a **Test Lab** window opens. It starts on **Your real screen**: OpenPath reads the names of the windows you have open each time you ask. Pick a practice screen in the Lab to try a scenario. On macOS, allow the microphone the first time you tap the circle, and allow **Screen Recording** so OpenPath can read window names (no screenshots are taken).
+**From the code (developers):** `npm install` then `npm start`. `OPENPATH_LAB=1 npm start` also opens the old Test Lab practice screens.
 
-**Installer:** `npm run dist:mac` or `npm run dist:win` writes a .dmg / .exe into `release/`.
+## Fully local
 
-## Demo walk-through
+"Local only" is on by default (Settings → Setup):
 
-1. In the Test Lab, click **Medical portal**. Tap the circle and say *"How do I log in?"* (or press **Say it for me**). OpenPath points at the Username field, waits for you, and continues step by step when you say *"done"*.
-2. Click **Bank**. Ask *"How much money do I have in checking?"* It reads the balance off the screen.
-3. Click **Fake virus pop-up**, then press **CALL NOW** or say *"It says I should call Microsoft."* The circle and sidebar lock red, OpenPath refuses, and a caregiver alert appears in the sidebar and in the Lab's family feed.
-4. Click **Gift card prize ad** and **Email inbox** for the other two scam patterns (fake prize with a "shipping fee", grandchild-in-trouble asking for gift card codes).
-5. Press the **Español**, **中文** or **हिन्दी** "Say it for me" button on any screen. OpenPath switches language, listens, and answers in that language. All four languages have full built-in guides and scam warnings.
-6. Open the sidebar (☰ on the reply card) to change voice speed, pause tolerance, the caregiver, keys, and to see history and costs.
+- Listening (Whisper), the voice (Kokoro, or the computer's own voices), reading the screen (macOS Vision), pointing, scam protection and all guides run on this computer.
+- The speech models, libraries and fonts download once the first time they are needed, then load from this computer. Every other connection from OpenPath is blocked, and Claude, ElevenLabs and cloud Whisper are never called.
+- Settings and caches live in OpenPath's folder on this computer. Conversations are not saved. Screen captures are read in memory and never stored.
 
-Everything above works with **no API keys and no internet**: built-in workflows answer, and the operating system's voices speak.
+Turning "Local only" off and adding an Anthropic key in Setup lets OpenPath answer questions the built-in guides do not cover, using Claude Opus 5.5 and a picture of the screen (asked once, never on bank, health or password pages).
 
-## Add keys for the full experience
+## Speed
 
-Sidebar → **Keys**:
+A small always-running helper (`electron/native/ocr-helper.swift`, built on `npm install`) captures and reads the screen with ScreenCaptureKit and Vision, leaving OpenPath's own windows out of the picture.
 
-| Key | What it unlocks | Without it |
-|---|---|---|
-| Anthropic | Claude Haiku 5.5 answers any question using the screen context | Built-in workflows only (login, bills, camera, text size, etc.) |
-| ElevenLabs | Warm multilingual voice (Flash v2.5) | System voices |
-| OpenAI (optional) | Whisper cloud transcription | Whisper runs on the device (desktop) or browser speech (web) |
-
-Keys are stored on this computer only (Electron userData folder, or browser storage in the web build).
+| Check | Time |
+|---|---|
+| Notice the page changed | about 0.06 s |
+| Recognize which page is showing | about 0.33 s |
+| Find the button to point at | about 0.35 s |
 
 ## How it is built
 
@@ -85,7 +93,23 @@ app/
 
 ### Business model (Account tab)
 
-7-day free trial, then **$19/month** (OpenPath Family) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
+7-day free trial, then **$15/month** (OpenPath Family) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
+
+## Pointing at what to click
+
+When OpenPath gives a step, a bright ring and an arrow appear on the button to press.
+
+- **Built-in guides** (Google Docs, Gmail, browser, practice screens) know the word to look for, such as "Insert". The Mac's own text recognition finds it on screen. Nothing leaves the computer, and it costs nothing.
+- **Any other question** (with a Claude key): Claude looks at a picture of the screen and says where to click, after asking permission once. Pictures are never sent for bank, health or password pages and are never saved.
+- Windows: Claude pointing works; the built-in text finder is macOS only for now.
+
+## Cost per user
+
+See the team's cost analysis document. In short: about $0.88 a month for an English speaker and about $3.32 for other languages on an average month, against $15. ElevenLabs is the only large cost, so it comes after the free English voice and the pre-recorded guide voice, and it has a monthly cap.
+
+```bash
+ELEVENLABS_API_KEY=... npm run voice-pack   # records every built-in sentence once (~$1.13)
+```
 
 ## Notes for the team
 

@@ -39,7 +39,7 @@ export const SCENARIOS = [
   {
     id: "bank",
     kind: "bank",
-    title: "Harbor Community Bank — accounts overview",
+    title: "Harbor Community Bank — online banking",
     short: "Bank",
     elements: [
       "Green header 'Harbor Community Bank' with your name 'Welcome, Dorothy'",
@@ -49,7 +49,7 @@ export const SCENARIOS = [
       "List 'Recent activity' with Shoprite $64.22, Pharmacy $18.90, City Electric $112.00",
       "'Sign out' link at the top right",
     ],
-    say: { en: "How much money do I have in checking?", es: "¿Cuánto dinero tengo en la cuenta de cheques?", zh: "我支票账户里有多少钱？", hi: "मेरे चेकिंग खाते में कितने पैसे हैं?" },
+    say: { en: "How do I pay my electric bill?", es: "¿Cómo pago la factura de la luz?", zh: "我怎么交电费？", hi: "मैं बिजली का बिल कैसे भरूँ?" },
   },
   {
     id: "scam-popup",

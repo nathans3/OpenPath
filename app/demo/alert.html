@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- A harmless imitation of a fake "tech support" pop-up, for the OpenPath scam demo.
+     The window title carries the same warning words real scam pages use. -->
+<title>Security Alert - Your computer is infected - Call Microsoft Support 1-888-555-0199</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: #0b3d91; font: 16px/1.4 Arial, Helvetica, sans-serif; color: #111; display: grid; place-items: center; }
+  .box { width: min(640px, calc(100% - 32px)); background: #fff; border: 5px solid #d80000; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .head { background: #d80000; color: #fff; font-weight: 900; padding: 14px 16px; letter-spacing: .02em; display: flex; justify-content: space-between; }
+  .body { padding: 22px 24px; display: grid; gap: 12px; }
+  .big { font-size: 22px; margin: 0; }
+  p { margin: 0; }
+  .phone { text-align: center; font-weight: 700; }
+  .phone span { display: block; font-size: 36px; color: #d80000; }
+  button { background: #ffcc00; border: 3px solid #d80000; font-weight: 900; font-size: 22px; padding: 14px; animation: blink 1s steps(2) infinite; cursor: pointer; }
+  @keyframes blink { 50% { background: #ff6a00; color: #fff; } }
+  .note { position: fixed; bottom: 8px; left: 0; right: 0; text-align: center; color: #cfe0ff; font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { button { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="box" role="alertdialog" aria-label="Security alert">
+    <div class="head"><span>🛡 WINDOWS DEFENDER SECURITY ALERT</span><span>×</span></div>
+    <div class="body">
+      <p class="big">Your computer is infected with <b>5 viruses</b>.</p>
+      <p>Your bank passwords and photos are being stolen right now. <b>Do not shut down your computer.</b></p>
+      <p class="phone">Call Microsoft Certified Support now<span>1-888-555-0199</span></p>
+      <button type="button">CALL NOW</button>
+    </div>
+  </div>
+  <p class="note">Demo page for OpenPath's scam protection. This is not a real warning.</p>
+</body>
+</html>

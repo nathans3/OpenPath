@@ -194,3 +194,70 @@ body.op-overlay-body { overflow: hidden; font-family: var(--font-body); color: v
 @media (prefers-reduced-motion: reduce) {
   #op-root * { animation: none !important; transition: none !important; }
 }
+
+/* ---------------- Pointer ----------------
+   Amber reads clearly on white documents, dark apps and blue buttons alike. */
+:root { --point: #ffb020; --point-ink: #1d1400; --point-glow: rgba(255, 176, 32, 0.55); }
+#op-root > .op-pointer-layer { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+.op-pointer-layer[hidden] { display: none; }
+.op-pointer-layer * { pointer-events: none; }
+.op-ring {
+  position: absolute; border-radius: 14px; border: 4px solid var(--point);
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 26px 6px var(--point-glow), inset 0 0 0 2px rgba(255,255,255,0.6);
+  opacity: 0; transform: scale(1.6); transition: opacity .25s ease .55s, transform .35s cubic-bezier(.2,.8,.2,1) .55s;
+}
+.op-pointer-layer.is-on .op-ring { opacity: 1; transform: scale(1); animation: op-ring-pulse 1.4s ease-in-out 1s infinite; }
+@keyframes op-ring-pulse { 0%,100% { box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 22px 4px var(--point-glow), inset 0 0 0 2px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 40px 14px var(--point-glow), inset 0 0 0 2px rgba(255,255,255,0.6); } }
+.op-cursor { position: absolute; left: 0; top: 0; transition: transform .7s cubic-bezier(.3,.7,.2,1); filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
+.op-cursor path { fill: var(--point); stroke: var(--point-ink); stroke-width: 2.2; stroke-linejoin: round; }
+.op-tag {
+  position: absolute; padding: 8px 14px; border-radius: 999px; background: var(--point); color: var(--point-ink);
+  font-family: var(--font-display); font-weight: 700; font-size: 18px; white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 8px 22px rgba(0,0,0,.3); opacity: 0; transition: opacity .25s ease .7s;
+}
+.op-pointer-layer.is-on .op-tag { opacity: 1; }
+.op-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.op-choices:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .op-cursor, .op-ring, .op-tag { transition: none !important; } }
+
+/* ---------------- Card header buttons ---------------- */
+.op-card .op-status .op-btn { min-height: 40px; min-width: 44px; padding: 4px 10px; font-size: 18px; }
+.op-card .op-status .close-card { font-size: 20px; }
+
+/* ---------------- Quick menu under the circle ---------------- */
+#op-root > .op-quick { position: absolute; display: grid; gap: 6px; width: 140px; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .14s ease, transform .14s ease; }
+#op-root > .op-quick.above { transform: translateY(6px); }
+#op-root > .op-quick.open { opacity: 1; transform: none; pointer-events: auto; }
+.op-qbtn { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 14px; font-weight: 700; box-shadow: 0 6px 18px rgba(0,0,0,.22); text-align: left; }
+.op-qbtn .i { width: 18px; text-align: center; font-size: 16px; }
+.op-qbtn:hover { background: var(--panel-3); }
+.op-quick.open .op-qbtn { animation: op-qin .22s ease both; }
+.op-quick.open .op-qbtn:nth-child(2) { animation-delay: .03s; }
+.op-quick.open .op-qbtn:nth-child(3) { animation-delay: .06s; }
+.op-quick.open .op-qbtn:nth-child(4) { animation-delay: .09s; }
+@keyframes op-qin { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* Faded circle: nearly invisible until the pointer comes near. */
+.op-circle { transition: opacity .35s ease; }
+.op-circle.is-faded { opacity: .18; }
+.op-circle.is-faded.is-hover, .op-circle.is-faded:focus-visible { opacity: .45; }
+.op-circle.is-faded.is-listening, .op-circle.is-faded.is-speaking, .op-circle.is-faded.is-thinking, .op-circle.is-faded.is-locked { opacity: 1; }
+
+/* ---------------- Motion: nothing opens or closes abruptly ---------------- */
+.op-enter { animation: op-in .22s cubic-bezier(.2,.8,.2,1) both; }
+.op-leave { animation: op-out .18s ease both; pointer-events: none !important; }
+@keyframes op-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes op-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(4px) scale(.98); } }
+#op-lock.op-enter { animation: op-drop .28s cubic-bezier(.2,.8,.2,1) both; }
+#op-lock.op-leave { animation: op-lift .2s ease both; }
+@keyframes op-drop { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+@keyframes op-lift { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-100%); } }
+.op-card .op-reply, .op-card .op-you { animation: op-text .25s ease both; }
+@keyframes op-text { from { opacity: 0; } to { opacity: 1; } }
+.op-choices > * { animation: op-in .22s cubic-bezier(.2,.8,.2,1) both; }
+.op-card { transition: left .25s cubic-bezier(.2,.8,.2,1), top .25s cubic-bezier(.2,.8,.2,1); }
+.op-pointer-layer.is-off .op-ring, .op-pointer-layer.is-off .op-tag, .op-pointer-layer.is-off .op-cursor { opacity: 0; transition: opacity .22s ease; animation: none; }
+#op-sidebar { top: var(--vis-top, 0px); bottom: var(--vis-bottom-gap, 0px); transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .25s ease; opacity: 0; }
+#op-sidebar.open { opacity: 1; }
+#op-sidebar:not(.open) { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .op-enter, .op-leave, #op-lock.op-enter, #op-lock.op-leave { animation-duration: .01s !important; } .op-card { transition: none; } }

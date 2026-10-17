@@ -10,6 +10,7 @@ const DEFAULTS = {
   voiceRate: 0.92,
   voiceStyle: "warm",
   autoSilenceMs: 2200,
+  boxHideSeconds: 15,           // the answer box fades after this many idle seconds; 0 = never
   maxListenMs: 20000,
   sttProvider: "auto",          // auto | local | openai | typed
   ttsProvider: "auto",          // auto | elevenlabs | system
@@ -17,7 +18,13 @@ const DEFAULTS = {
   elevenLabsKey: "",
   elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL",
   openaiKey: "",
-  model: "claude-haiku-5-5",
+  qualityMode: "best",          // best | low
+  modelChoice: "",              // "" = follow qualityMode; or a specific Claude model id
+  bestMonthlyCap: 600,          // Opus answers per month, then Haiku until next month
+  localOnly: true,              // nothing leaves this computer; cloud AI is off even with a key
+  hideFromRecordings: false,    // true = OpenPath does not appear in screen recordings or screen sharing
+  screenPictures: "ask",        // ask | on | off — may Claude see a picture of the screen to point?
+  ttsMonthlyCap: 60000,         // ElevenLabs characters per month (≈ $3); then the free voice
   caregiverName: "",
   caregiverPhone: "",
   caregiverWebhook: "",
@@ -25,10 +32,10 @@ const DEFAULTS = {
     plan: "trial",
     trialStartedAt: null,
     setupPaid: false,
-    monthlyPrice: 19,
+    monthlyPrice: 15,
     setupPrice: 29,
   },
-  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0 },
+  usage: { llmCalls: 0, llmInputTokens: 0, llmOutputTokens: 0, ttsChars: 0, ttsCacheHits: 0, sttSeconds: 0, cacheHitsLLM: 0, ttsMonth: "", ttsCharsMonth: 0, llmMonth: "", bestCallsMonth: 0 },
 };
 
 function readRaw() {
@@ -37,7 +44,9 @@ function readRaw() {
 
 function getAll() {
   const raw = readRaw();
-  const merged = { ...DEFAULTS, ...raw, account: { ...DEFAULTS.account, ...(raw.account || {}) }, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
+  // Prices always come from the app, never from an older saved file.
+  const account = { ...DEFAULTS.account, ...(raw.account || {}), monthlyPrice: DEFAULTS.account.monthlyPrice, setupPrice: DEFAULTS.account.setupPrice };
+  const merged = { ...DEFAULTS, ...raw, account, usage: { ...DEFAULTS.usage, ...(raw.usage || {}) } };
   if (!merged.account.trialStartedAt) {
     merged.account.trialStartedAt = new Date().toISOString();
     write(merged);

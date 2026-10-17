@@ -21,6 +21,9 @@ const path = require("path");
 const store = require("./services/store");
 const anthropic = require("./services/anthropic");
 const tts = require("./services/tts");
+const vision = require("./services/vision");
+const follow = require("./services/follow");
+const offline = require("./services/offline");
 const stt = require("./services/stt");
 
 let overlay = null;
@@ -29,11 +32,19 @@ let tray = null;
 
 // ---------- Overlay window (circle + sidebar) ----------
 function createOverlay() {
+  // The overlay covers the whole primary display (menu bar included) so the
+  // pointer can reach anything, and stays click-through except over the
+  // circle, card and sidebar.
   const display = screen.getPrimaryDisplay();
-  const { x, y, width, height } = display.workArea;
+  const { x, y, width, height } = display.bounds;
 
   overlay = new BrowserWindow({
     x, y, width, height,
+    // A non-activating panel on macOS: clicking the circle or the card does
+    // not take focus away from the app the person is using, so an open menu
+    // in that app stays open while they press "I did it".
+    ...(process.platform === "darwin" ? { type: "panel" } : {}),
+    enableLargerThanScreen: true,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -56,6 +67,11 @@ function createOverlay() {
   // Float above full-screen apps and follow the user across Spaces.
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Visible in screen recordings and screen sharing by default (so a demo or a
+  // family member helping over a video call can see it). OpenPath's own text
+  // reader ignores the circle, box and pointer by their position instead.
+  overlay.setContentProtection(store.getAll().hideFromRecordings === true);
+  overlay.setBounds(display.bounds);
 
   // Start click-through; the renderer tells us when the cursor is over
   // something interactive (the circle, the sidebar, a card) and we toggle.
@@ -67,8 +83,7 @@ function createOverlay() {
   // Keep the overlay matched to the display if resolution or dock changes.
   screen.on("display-metrics-changed", () => {
     if (!overlay) return;
-    const wa = screen.getPrimaryDisplay().workArea;
-    overlay.setBounds(wa);
+    overlay.setBounds(screen.getPrimaryDisplay().bounds);
   });
 }
 
@@ -122,9 +137,22 @@ ipcMain.on("overlay:interactive", (_e, interactive) => {
 });
 
 ipcMain.handle("settings:get", () => store.getAll());
-ipcMain.handle("settings:set", (_e, patch) => store.patch(patch));
+ipcMain.handle("settings:set", (_e, patch) => {
+  const next = store.patch(patch);
+  if ("hideFromRecordings" in patch && overlay) overlay.setContentProtection(next.hideFromRecordings === true);
+  return next;
+});
 
 ipcMain.handle("ai:instruct", (_e, payload) => anthropic.instruct(payload, store.getAll()));
+ipcMain.handle("ai:point", (_e, payload) => anthropic.point(payload, store.getAll()));
+ipcMain.handle("ai:available", () => anthropic.available(store.getAll()));
+ipcMain.handle("screen:locate", (_e, { labels, near, exclude }) => vision.locate(labels, near, exclude));
+ipcMain.handle("screen:findAll", (_e, { labels, exclude }) => vision.findAll(labels, exclude));
+ipcMain.handle("follow:watch", (e, target) => follow.watch(e.sender, target));
+ipcMain.handle("follow:stop", () => { follow.stop(); return true; });
+ipcMain.handle("follow:status", () => follow.status());
+ipcMain.handle("offline:stats", () => offline.stats());
+ipcMain.handle("follow:permission", () => follow.requestPermission());
 ipcMain.handle("tts:speak", (_e, payload) => tts.synthesize(payload, store.getAll()));
 ipcMain.handle("tts:cacheStats", () => tts.cacheStats());
 ipcMain.handle("tts:clearCache", () => tts.clearCache());
@@ -140,9 +168,6 @@ ipcMain.on("lab:say", (_e, text) => {
 ipcMain.on("overlay:event", (_e, evt) => {
   // Caregiver alerts and lockdowns are mirrored to the Lab so testers see them.
   if (lab) lab.webContents.send("overlay:event", evt);
-});
-ipcMain.handle("app:openExternal", (_e, url) => {
-  if (/^https:\/\//.test(url)) shell.openExternal(url);
 });
 
 // Real screen awareness: the titles of the windows that are open right now.
@@ -162,10 +187,6 @@ ipcMain.handle("screen:context", async () => {
     return { ok: false, reason: "error", detail: String(err?.message || err) };
   }
 });
-ipcMain.handle("screen:permission", () => {
-  if (process.platform === "darwin") shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
-  return true;
-});
 ipcMain.handle("app:info", () => ({
   platform: process.platform,
   version: app.getVersion(),
@@ -175,10 +196,14 @@ ipcMain.handle("app:info", () => ({
 // ---------- Lifecycle ----------
 app.whenReady().then(() => {
   if (process.platform === "darwin") app.dock?.hide();
+  offline.install(() => store.getAll());
   createOverlay();
   createTray();
-  createLab();
+  // The Test Lab opens only when asked (tray menu, Settings, or OPENPATH_LAB=1).
+  if (process.env.OPENPATH_LAB === "1") createLab();
 });
+
+app.on("will-quit", () => { vision.cleanup(); follow.shutdown(); });
 
 app.on("window-all-closed", () => {
   // Keep running in the tray like a background utility.

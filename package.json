@@ -9,23 +9,64 @@
   "scripts": {
     "start": "electron .",
     "web": "node scripts/serve.js",
+    "voice-pack": "node scripts/build-voice-pack.mjs",
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
-    "dist:win": "electron-builder --win --publish never"
+    "dist:win": "electron-builder --win --publish never",
+    "build-helper": "swiftc -O electron/native/ocr-helper.swift -o electron/native/bin/ocr-helper",
+    "postinstall": "node -e \"process.platform==='darwin'&&require('child_process').execSync('npm run build-helper',{stdio:'inherit'})\" || true"
   },
   "devDependencies": {
     "electron": "33.2.1",
     "electron-builder": "25.1.8"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.135.0"
+    "@anthropic-ai/sdk": "^0.135.0",
+    "uiohook-napi": "^1.5.4"
   },
   "build": {
     "appId": "org.openpath.app",
     "productName": "OpenPath",
-    "files": ["electron/**", "app/**", "package.json"],
-    "mac": { "category": "public.app-category.utilities", "target": ["dmg", "zip"] },
-    "win": { "target": ["nsis", "portable"] },
-    "directories": { "output": "release" }
+    "files": [
+      "electron/**",
+      "app/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "OpenPath listens only after you tap the circle, so you can ask for help out loud.",
+        "NSScreenCaptureUsageDescription": "OpenPath reads your screen on this computer to know which page you are on and where to point. Nothing is saved or sent.",
+        "LSUIElement": true
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "directories": {
+      "output": "release"
+    },
+    "asarUnpack": [
+      "electron/native/bin/**"
+    ],
+    "npmRebuild": false
   }
 }

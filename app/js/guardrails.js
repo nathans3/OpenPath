@@ -172,3 +172,15 @@ export function refusalText(lang, category) {
   const table = T[lang] || T.en;
   return table[category] || table.default;
 }
+
+// Pages where OpenPath never sends a picture of the screen (the desktop main
+// process checks the same list before capturing).
+const SENSITIVE_TITLE = /(bank|credit union|chase|wells fargo|citi|capital one|paypal|venmo|zelle|mychart|patient|health|medicare|medicaid|pharmacy|insurance|password|passcode|1password|keychain|sign ?in|log ?in|login|tax|irs|social security)/i;
+export function isSensitiveTitle(title) { return SENSITIVE_TITLE.test(title || ""); }
+
+// All fixed scam warnings, for the pre-recorded voice pack.
+export function allRefusalSentences() {
+  const out = {};
+  for (const lang of ["en", "es", "zh", "hi"]) out[lang] = ["fake_tech_support", "fake_prize", "family_emergency", "default"].map((c) => refusalText(lang, c));
+  return out;
+}
