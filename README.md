@@ -1,59 +1,111 @@
-# OpenPath
+<p align="center"><img src="brand/openpath-logo.png" alt="OpenPath" width="460"></p>
 
-A floating voice helper for older adults. One glowing circle sits on top of whatever is on the screen. Tap it, say what you are trying to do, and OpenPath answers out loud with one clear step at a time and points at what to click. It answers with Claude, listens and speaks on your computer, speaks English, Spanish, Chinese and Hindi, and refuses to help with scams.
+<p align="center"><b>A voice helper for older adults that shows the way, one step at a time.</b></p>
 
-Desktop app for macOS and Windows (Electron). The same interface also runs in a browser as a web preview.
+OpenPath is a glowing circle that floats on top of whatever is on the screen. Press **Ctrl+O** (or tap the circle) and say what you are trying to do. OpenPath answers out loud with one clear step, points at the exact box or button with a glowing ring, and moves to the next step when you have done it. It only tells and points: it never clicks, types or opens anything for you.
 
-## What it does best: signing up for a Google account
+It answers questions with Claude, listens and speaks on your computer, works in English, Spanish, Chinese and Hindi, and refuses to help with scams.
 
-Ask out loud: **"How do I make a Google account?"** OpenPath walks you through Google's real sign-up, on your real screen:
+## Demo
 
-- It recognizes each Google page as it appears: sign-in, "Create account", name, birthday, Gmail address, password, phone check, code, recovery email, review and terms. Google sometimes skips or adds pages, and OpenPath follows whichever one shows.
-- It says one step at a time and points at the box or button with a glowing ring.
-- After you type, the pointer moves to **Next**. When Google shows the next page, OpenPath gives the next step. If you end up on the wrong page, it tells you how to go back.
-- It only tells and points. It never opens, clicks or types anything for you.
-- It works in English, Spanish, Chinese and Hindi.
+[![Watch the 30-second demo](demo/openpath-demo-poster.png)](https://github.com/nathans3/OpenPath/raw/main/demo/openpath-demo.mp4)
 
-Other built-in guides: Google Docs (new document tab, new document, share), Gmail (write an email), browser tabs, undo, copy and paste, bigger text, volume. Scam protection locks the screen red on fake virus warnings, prize ads and gift-card requests.
+[Watch the demo](https://github.com/nathans3/OpenPath/raw/main/demo/openpath-demo.mp4) (30 seconds). A grandpa asks "How do I make a Google account?" and OpenPath guides the sign-up. There is also a [version with a gap for your own voice](https://github.com/nathans3/OpenPath/raw/main/demo/openpath-demo-your-voice.mp4), where your question goes at 1.4 seconds.
 
-## Install and run
+The demo is recorded from a re-creation of Google's pages, with OpenPath's real circle, answer box, pointer and voice on top. The spoken steps are shortened to fit 30 seconds. It is not footage of a live sign-up; say so if anyone asks.
 
-**Mac app:** build it once, then double-click `release/mac-arm64/OpenPath.app`.
+## What it does
+
+**Signing up for a Google account** is the job it does best. Ask "How do I make a Google account?" and OpenPath follows Google's real sign-up on your real screen:
+
+- It recognizes each Google page as it appears: Google's home page, sign-in, "Create account", name, birthday, Gmail address, password, phone check, code, recovery email, review and terms. Google sometimes skips or adds pages, and OpenPath follows whichever one shows.
+- It goes one box at a time. It says only the current step ("Click the First name box and type your first name"), rings that box, and moves on once the box holds an answer, you press Enter, or you pick from a list (Month, Gender).
+- If you land on a page that is not part of the sign-up, it tells you how to go back and labels the Back arrow and the address bar.
+- "Say that again" repeats the current step.
+
+**Other built-in guides:** Google Docs (new document tab, new document, share), Gmail (write an email), browser tabs, undo, copy and paste, bigger text, volume.
+
+**Any other question:** Claude answers, and can look at a picture of the screen (with permission) to point at the right button.
+
+**Scam protection:** fake virus warnings, prize ads, gift-card requests and "tech support" calls lock the screen red. OpenPath refuses and can alert a family member.
+
+## Using it
+
+| To | Do this |
+|---|---|
+| Ask a question | Press **Ctrl+O** from any app, or tap the circle, then talk. It stops listening on its own after a pause. |
+| Stop it talking | Press Ctrl+O or tap the circle; it stops and listens. |
+| Type instead | Press "Type instead" in the answer box. |
+| Hear it again | Press "Say it again", or say "say that again". |
+| Settings | Hover over the circle and press the gear. Tabs: Voice, Family, Account, Setup, History, Costs. |
+
+## Install
+
+### Mac
+
+You need macOS 14 (Sonoma) or later, [Node.js](https://nodejs.org) 20 or later, and the Xcode Command Line Tools (`xcode-select --install`), which build OpenPath's small screen-reading helper.
 
 ```bash
+git clone https://github.com/nathans3/OpenPath.git
+cd OpenPath
 npm install
 npx electron-builder --mac dir --arm64 --publish never
+open release/mac-arm64/OpenPath.app
 ```
 
-The first time, macOS asks for three permissions. Allow them in System Settings → Privacy & Security:
+The first time, allow these in System Settings → Privacy & Security:
 
 | Permission | Why |
 |---|---|
-| Microphone | Hears your question after you tap the circle |
-| Screen & System Audio Recording | Reads the screen on this computer to know the page and where to point |
-| Accessibility (optional) | Notices your clicks instantly; without it OpenPath watches the screen instead |
+| Microphone | Hears your question after Ctrl+O or a tap |
+| Screen & System Audio Recording | Reads the screen to know the page and where to point |
+| Accessibility | Notices your clicks and the Enter key so it can move to the next step, and finds the browser's Back arrow |
 
-**From the code (developers):** `npm install` then `npm start`. `OPENPATH_LAB=1 npm start` also opens the old Test Lab practice screens.
+The app is not signed yet, so macOS may treat each new build as a new app. If clicks or Enter stop working after an update, switch OpenPath off and on again under Accessibility.
+
+### Claude key
+
+OpenPath answers anything beyond its built-in guides with Claude. Add a key once in Settings → Setup (create one at console.anthropic.com). The key is encrypted on the computer and never shown again. Without a key, only the built-in guides answer. Before launch, this should move to an OpenPath server so customers never handle a key.
+
+### Windows
+
+```bash
+npm run dist:win
+```
+
+The Windows build runs the circle, voice, Claude answers and Claude's pointing. Reading the screen on the computer (for the built-in guides) is macOS only for now.
 
 ## How it answers
 
-OpenPath answers with Claude.
-
-- Claude Haiku 5.5 answers first. OpenPath checks that the button it names is really on the screen. Claude Sonnet 5.5 answers only when that check fails, up to 300 times a month per user.
-- The Google sign-up guide and the other built-in guides answer instantly without calling Claude.
-- Add the Claude key once in Settings → Setup. Without a key, only the built-in guides answer.
-- Listening (Whisper), the voice (Kokoro, or the computer's own voice for Chinese), reading the screen, pointing and scam protection run on this computer.
-- To talk, tap the circle or press **Ctrl+O** from any app. Press it again to stop.
+- The Google sign-up guide and the other built-in guides answer instantly on the computer, without calling Claude.
+- For everything else, Claude Haiku 5.5 answers first. OpenPath checks that the button it names is really on the screen. Claude Sonnet 5.5 answers only when that check fails, up to 300 times a month per user.
+- OpenPath never uses Anthropic's "Covered Models" (Fable, Mythos), which must keep data for 30 days.
+- Listening uses Whisper on the computer. The voice is Kokoro on the computer for English, Spanish and Hindi, and the computer's own voice for Chinese.
 
 ## Privacy and security
 
-- **Where data goes:** only to Claude (api.anthropic.com), and only after passwords, card numbers, codes and other private details are removed, including from earlier questions in the conversation. The app blocks every other connection, both from its windows and from its main process.
-- **The microphone** turns on only after a tap or Ctrl+O and stops on its own. Speech is turned into words on the computer and never saved or sent.
+- **Where data goes:** only to Claude (api.anthropic.com), and only after passwords, card numbers, codes, dates of birth and emails are removed, including from earlier questions in the conversation. The app blocks every other connection from both its windows and its main process. App parts (speech models, libraries, fonts) download once, then load from the computer.
+- **The microphone** turns on only after Ctrl+O or a tap, and stops on its own. Speech becomes words on the computer and is never saved or sent.
+- **Clicks and keys:** with the Accessibility permission, OpenPath notices clicks near the box it points at and whether Enter was pressed. It never looks at, keeps or sends any other key.
 - **Screen pictures** go to Claude only with permission, never on bank, health or password pages, and are never saved.
-- **What is stored:** settings in `openpath-settings.json`, with the Claude key encrypted by the operating system (Keychain on Mac, DPAPI on Windows), plus downloaded speech models. Conversations and answers stay in memory and disappear when OpenPath quits.
+- **What is stored:** settings in `openpath-settings.json` (owner-only), with the Claude key encrypted by the operating system (Keychain on Mac, DPAPI on Windows), plus downloaded speech models. Conversations and answers stay in memory and disappear when OpenPath quits.
 - **Delete all my data** in Settings → Setup removes everything personal from the computer.
 - **App hardening:** windows run sandboxed with no Node access, may only use the microphone, cannot open pop-ups or leave the app's own pages, and never receive the Claude key.
-- See `electron/services/privacy.js` for the guards.
+
+The guards are in `electron/services/privacy.js`, `offline.js` and `store.js`, and `app/js/guardrails.js`.
+
+## Price and costs
+
+7-day free trial, then **$7.99 a month**, one plan with nothing sold on top, plus an optional one-time **$29** setup.
+
+| User | Questions a day | Cost to us per month | Margin |
+|---|---|---|---|
+| Light | 2 | $0.70 | 91% |
+| Average | 8 | $1.04 | 87% |
+| Frequent | 20 | $1.72 | 78% |
+| Heavy | 40 | $2.23 | 72% |
+
+Card fees are $0.59 of each payment; the rest is Claude. Listening and voices cost nothing. The team's cost analysis and privacy documents have the details (ask Steven for access).
 
 ## Speed
 
@@ -63,81 +115,70 @@ A small always-running helper (`electron/native/ocr-helper.swift`, built on `npm
 |---|---|
 | Notice the page changed | about 0.06 s |
 | Recognize which page is showing | about 0.33 s |
-| Find the button to point at | about 0.35 s |
+| Find the box or button to point at | about 0.35 s |
 
 ## How it is built
 
+Electron 33 with plain ES modules (no bundler), so you can edit a file and reload.
+
 ```
 electron/
-  main.js            transparent always-on-top overlay window, Test Lab window, tray, IPC
-  preload.js         the only bridge between the UI and Node
+  main.js            the transparent always-on-top overlay window, tray, Ctrl+O hotkey, IPC
+  preload.js         the only bridge between the windows and the computer
+  native/
+    ocr-helper.swift screen capture and text reading (ScreenCaptureKit + Vision), browser parts
   services/
-    anthropic.js     Claude via @anthropic-ai/sdk, prompt caching, SHA-256 answer cache
-    stt.js           Whisper cloud (opt-in)
-    store.js         settings JSON
+    anthropic.js     Claude: Haiku first, Sonnet when needed, in-memory answer cache
+    vision.js        finds words on screen, reads regions, reads the browser's web address
+    follow.js        notices when a step is done: screen changes, clicks, Enter, list picks
+    offline.js       what the windows may download; everything else is blocked
+    privacy.js       network guard, window lockdown, private temp folder, delete-all
+    store.js         settings, with the Claude key encrypted
+    stt.js           stub: listening stays on the computer
 app/
-  overlay.html       circle + sidebar (desktop)
-  lab.html           Test Lab (desktop)
-  index.html         web preview: Lab as the "desktop", overlay on top
+  overlay.html       the circle, answer box, pointer and settings (desktop)
+  index.html         web preview
+  lab.html           practice screens (OPENPATH_LAB=1 npm start)
   js/
-    bridge.js        same API in Electron and in the browser
-    engine.js        request pipeline: redact → scam guardrail → workflow library → Claude → fallback
-    guardrails.js    redaction (passwords, SSN, cards, accounts, codes) and scam scoring
-    knowledge.js     built-in step-by-step workflows in English, Spanish, Chinese, Hindi
-    speech.js        listening (browser speech / local Whisper / cloud Whisper) with silence cutoff; speaking (Kokoro for English, Spanish and Hindi; the computer's voice for Chinese)
-    circle.js        the floating widget and reply card
-    sidebar.js       Voice · Family · Account · Keys · History · Costs
-    lab.js           practice screens
-    scenarios.js     what each practice screen "shows" to the engine
-    i18n.js          languages and interface strings
+    app.js           the overlay: listening, answering, the page-aware guide runner
+    guides.js        page-aware guides for real websites (Google sign-up), one step at a time
+    knowledge.js     built-in step-by-step guides in English, Spanish, Chinese, Hindi
+    engine.js        request pipeline: redact → scam check → guides → Claude → fallback
+    guardrails.js    redaction and scam scoring
+    speech.js        Whisper listening, Kokoro and system voices
+    circle.js        the circle and answer box
+    pointer.js       the glowing ring, arrow and "Click here" label
+    sidebar.js       settings tabs
+    i18n.js          languages and interface words
+demo/
+  openpath-demo.mp4  the 30-second demo (and a version with a gap for your voice)
+  video/             scripts that record the demo
+brand/               logo, app icon and colors
 ```
 
-### Guardrails that are always on
+## For developers
 
-- **Screen awareness, titles only:** with no practice screen picked, each question reads the titles of open windows (redacted on the device). No screenshots, nothing in the background.
-- **Consent:** the microphone only opens after a deliberate tap or Ctrl+O and closes by itself after a pause (adjustable 1.2–4.5 s) or 20 s. Nothing streams in the background.
-- **Redaction before anything leaves the device:** passwords, Social Security numbers, card numbers (Luhn-checked), account numbers, one-time codes, dates of birth and emails are replaced with placeholders. Logged in History so a caregiver can see it happened.
-- **Scam interception:** the user's words and the on-screen cues are scored for fake tech support, prizes, gift cards, wire transfers, remote access, government threats, urgency and secrecy. Above the threshold the circle and sidebar lock red, OpenPath refuses, and an alert is logged and optionally POSTed to a caregiver webhook (Zapier, IFTTT, your server).
-- **Cost ceilings:** 160 output tokens per answer, SHA-256 caches for both answers and audio, offline workflows for the common tasks, Claude Haiku first, Sonnet only when needed. The Costs tab shows the running estimate.
+| Command | What it does |
+|---|---|
+| `npm start` | Run OpenPath from the code |
+| `OPENPATH_LAB=1 npm start` | Also open the practice screens |
+| `npm run web` | Web preview at http://localhost:5173 |
+| `npm run dist:mac` / `npm run dist:win` | Build the app |
+| `npm run build-helper` | Rebuild the Mac screen-reading helper |
+| `npm run demo-voices` then `npm run demo-video-30s` | Re-record the demo video |
+| `npm run demo-add-voice -- ~/Desktop/question.m4a` | Put your own question into the demo |
 
-### Business model (Account tab)
-
-7-day free trial, then **$7.99/month** (OpenPath Family, one plan) plus a one-time **$29** setup. Checkout is simulated in the demo; production uses Stripe. Unit economics are shown in the tab.
-
-## Pointing at what to click
-
-When OpenPath gives a step, a bright ring and an arrow appear on the button to press.
-
-- **Built-in guides** (Google Docs, Gmail, browser, practice screens) know the word to look for, such as "Insert". The Mac's own text recognition finds it on screen. Nothing leaves the computer, and it costs nothing.
-- **Any other question** (with a Claude key): Claude looks at a picture of the screen and says where to click, after asking permission once. Pictures are never sent for bank, health or password pages and are never saved.
-- Windows: Claude pointing works; the built-in text finder is macOS only for now.
-
-## Cost per user
-
-See the team's cost analysis document. In short, at $7.99 a month an average user costs about $1.04 (87% margin) and a heavy user about $2.23 (72% margin). Card fees are $0.59 of that; the rest is Claude. Voices are free: Kokoro for English, Spanish and Hindi on any computer, and the computer's own voice for Chinese.
-
-Note for the team: the Spanish and Hindi pronunciation step uses espeak-ng, which is GPL-3.0 licensed. OpenPath downloads it at run time instead of bundling it. Check the license before selling a packaged version.
-
-## Demo video
-
-A 30-second demo of the Google sign-up, recorded from a re-creation of Google's pages with OpenPath's real circle, answer box, pointer and voice on top.
+**Debug log:** start the app with logging to see one `[guide]` line per page, step and signal (never what was typed):
 
 ```bash
-npm run demo-voices
-npm run demo-video-30s
+open -a "$PWD/release/mac-arm64/OpenPath.app" --stderr /tmp/openpath.log --args --enable-logging=stderr
 ```
 
-This makes two videos in `demo/video/out/`: one with a voice asking "How do I make a Google account?", and one with a quiet gap at 1.4 seconds for your own recording. To put your recording in the gap:
+## Before launch
 
-```bash
-npm run demo-add-voice -- ~/Desktop/my-question.m4a
-```
-
-The Google screens are re-created, not filmed. Say so if someone asks whether it is a live recording.
-
-## Notes for the team
-
-- Branch `openpath-demo` has the demo. Open a pull request into `main` when you are happy with it.
-- No bundler. Plain ES modules, so you can edit a file and reload.
-- Local Whisper uses `@huggingface/transformers` loaded from jsDelivr with the `whisper-tiny` model (about 40 MB, downloaded once). If the download is blocked, OpenPath falls back to typing.
-- Browser speech recognition is Chrome/Edge only, which is why the desktop app defaults to local Whisper.
+- [ ] Run Claude through an OpenPath server with one company key, and ask Anthropic for zero data retention.
+- [ ] Sign and notarize the Mac app (Apple Developer Program) and sign the Windows installer.
+- [ ] Read the screen on Windows, so the built-in guides work there too.
+- [ ] Publish a plain-language privacy policy, and have a lawyer review state privacy laws.
+- [ ] Check the license of espeak-ng (GPL-3.0), used for Spanish and Hindi pronunciation. OpenPath downloads it at run time instead of bundling it.
+- [ ] Choose a license for this repository.
