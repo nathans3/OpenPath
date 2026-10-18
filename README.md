@@ -92,7 +92,7 @@ The Windows build runs the circle, voice, Claude answers and Claude's pointing. 
 - **Delete all my data** in Settings → Setup removes everything personal from the computer.
 - **App hardening:** windows run sandboxed with no Node access, may only use the microphone, cannot open pop-ups or leave the app's own pages, and never receive the Claude key.
 
-The guards are in `electron/services/privacy.js`, `offline.js` and `store.js`, and `app/js/guardrails.js`.
+The guards are in `electron/services/privacy.js`, `offline.js` and `store.js`, and `app/js/guardrails.js`. The [privacy and data document](docs/privacy-and-data.md) has the talk track for presentations, what is stored, every safeguard and the tests.
 
 ## Price and costs
 
@@ -105,7 +105,7 @@ The guards are in `electron/services/privacy.js`, `offline.js` and `store.js`, a
 | Frequent | 20 | $1.72 | 78% |
 | Heavy | 40 | $2.23 | 72% |
 
-Card fees are $0.59 of each payment; the rest is Claude. Listening and voices cost nothing. The team's cost analysis and privacy documents have the details (ask Steven for access).
+Card fees are $0.59 of each payment; the rest is Claude. Listening and voices cost nothing. Details: [Cost analysis](docs/cost-analysis.md) and [Privacy and data](docs/privacy-and-data.md).
 
 ## Speed
 
@@ -154,6 +154,7 @@ demo/
   openpath-demo.mp4  the 30-second demo (and a version with a gap for your voice)
   video/             scripts that record the demo
 brand/               logo, app icon and colors
+docs/                cost analysis, privacy and data
 ```
 
 ## For developers
