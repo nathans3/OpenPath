@@ -6,6 +6,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { KokoroTTS } from "kokoro-js";
+import { execFileSync } from "child_process";
+import { createRequire } from "module";
+const FFMPEG = createRequire(import.meta.url)("ffmpeg-static");
 import { GUIDES } from "../../app/js/guides.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +38,8 @@ const L = {
   terms: page("terms").text.en,
   done: page("done").text.en,
 };
-const QUESTION = "How do I make a Google account?";
+// The person asking: a grandpa, deep, a little slow and hesitant.
+const QUESTION = "Um... how do I make a Google account?";
 // The 30-second cut uses shortened versions of the same steps.
 const SHORT = {
   s_home: "This is Google. Click the blue Sign in button at the top right.",
@@ -50,10 +54,19 @@ Object.assign(L, SHORT);
 const tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", { dtype: "q8", device: "cpu" });
 const secs = {};
 for (const [key, text] of [...Object.entries(L), ["question", QUESTION]]) {
-  const voice = key === "question" ? "af_sarah" : "af_heart";
-  const audio = await tts.generate(text, { voice, speed: key === "question" ? 0.95 : key.startsWith("s_") ? 1.05 : 0.95 });
-  await audio.save(path.join(out, `${key}.wav`));
+  const voice = key === "question" ? "am_onyx" : "af_heart";
+  const audio = await tts.generate(text, { voice, speed: key === "question" ? 0.78 : key.startsWith("s_") ? 1.05 : 0.95 });
+  const file = path.join(out, `${key}.wav`);
+  await audio.save(file);
   secs[key] = +(audio.audio.length / audio.sampling_rate).toFixed(2);
+  if (key === "question") {
+    // Sound older: a little lower, a gentle tremble, a thinner tone.
+    const raw = path.join(out, "question-raw.wav");
+    fs.renameSync(file, raw);
+    execFileSync(FFMPEG, ["-y", "-loglevel", "error", "-i", raw, "-af",
+      "asetrate=24000*0.9,aresample=24000,atempo=1.111,vibrato=f=5:d=0.22,highpass=f=110,lowpass=f=5200,acompressor=threshold=0.2:ratio=2,volume=1.15", file]);
+    fs.unlinkSync(raw);                      // same length: the lower pitch and the tempo cancel out
+  }
   console.log(key.padEnd(12), secs[key] + "s", text.slice(0, 60));
 }
 fs.writeFileSync(path.join(here, "out", "voices.json"), JSON.stringify(secs, null, 2));
