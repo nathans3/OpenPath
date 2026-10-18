@@ -13,11 +13,17 @@
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",
     "build-helper": "swiftc -O electron/native/ocr-helper.swift -o electron/native/bin/ocr-helper",
-    "postinstall": "node -e \"process.platform==='darwin'&&require('child_process').execSync('npm run build-helper',{stdio:'inherit'})\" || true"
+    "postinstall": "node -e \"process.platform==='darwin'&&require('child_process').execSync('npm run build-helper',{stdio:'inherit'})\" || true",
+    "demo-voices": "node demo/video/build-voices.mjs",
+    "demo-video": "electron demo/video/record.js",
+    "demo-video-30s": "SHORT=1 electron demo/video/record.js",
+    "demo-add-voice": "node demo/video/add-voice.js"
   },
   "devDependencies": {
     "electron": "33.2.1",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "ffmpeg-static": "^5.2.0",
+    "kokoro-js": "^1.2.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

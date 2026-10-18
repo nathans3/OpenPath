@@ -5,3 +5,4 @@ release/
 .env
 electron/native/bin/
 release-next/
+demo/video/out/
