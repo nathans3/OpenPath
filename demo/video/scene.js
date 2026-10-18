@@ -169,13 +169,13 @@ async function play(L) {
   point(first, "First name");
   await say("name", L.name);
   await moveTo(first, { at: "left" }); await click();
-  await typeInto(first, "Margaret");
+  await typeInto(first, "Open");
   await sleep(1300);
   unpoint(); circle.setTranscript("Got it ✓", false, { plain: true });
   point(last, "Last name (optional)");
   await say("name.1", L["name.1"]);
   await moveTo(last, { at: "left" }); await click();
-  await typeInto(last, "Lee");
+  await typeInto(last, "Path");
   await sleep(1300);
   unpoint(); focusField(null);
   point($("#name-next"), "Next");
@@ -228,7 +228,7 @@ async function play(L) {
   point(user, "Username");
   await say("username.1", L["username.1"]);
   await moveTo(user, { at: "left" }); await click();
-  await typeInto(user, "margaret.lee.1948", { per: 120 });
+  await typeInto(user, "open.path", { per: 120 });
   await sleep(1300);
   unpoint(); focusField(null);
   point($("#user-next"), "Next");
@@ -327,10 +327,10 @@ async function playShort(L) {
   point(first, "First name");
   await sleep(300);
   await moveTo(first, { ...fast, at: "left" }); await fclick();
-  await typeInto(first, "Margaret", { per: 35 });
+  await typeInto(first, "Open", { per: 35 });
   unpoint(); point(last, "Last name (optional)");
   await moveTo(last, { ...fast, at: "left" }); await fclick();
-  await typeInto(last, "Lee", { per: 50 });
+  await typeInto(last, "Path", { per: 50 });
   unpoint(); focusField(null); point($("#name-next"), "Next");
   await moveTo($("#name-next"), fast); await fclick();
   await talk;
@@ -366,7 +366,7 @@ async function playShort(L) {
   own.classList.add("on"); user.style.display = "flex"; $("#user-hint").style.display = "block";
   unpoint(); point(user, "Username");
   await moveTo(user, { ...fast, at: "left" }); await fclick();
-  await typeInto(user, "margaret.lee.1948", { per: 28 });
+  await typeInto(user, "open.path", { per: 28 });
   unpoint(); focusField(null); point($("#user-next"), "Next");
   await moveTo($("#user-next"), fast); await fclick();
   await talk;
