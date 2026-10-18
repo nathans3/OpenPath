@@ -118,6 +118,23 @@ See the team's cost analysis document. In short, at $7.99 a month an average use
 
 Note for the team: the Spanish and Hindi pronunciation step uses espeak-ng, which is GPL-3.0 licensed. OpenPath downloads it at run time instead of bundling it. Check the license before selling a packaged version.
 
+## Demo video
+
+A 30-second demo of the Google sign-up, recorded from a re-creation of Google's pages with OpenPath's real circle, answer box, pointer and voice on top.
+
+```bash
+npm run demo-voices
+npm run demo-video-30s
+```
+
+This makes two videos in `demo/video/out/`: one with a voice asking "How do I make a Google account?", and one with a quiet gap at 1.4 seconds for your own recording. To put your recording in the gap:
+
+```bash
+npm run demo-add-voice -- ~/Desktop/my-question.m4a
+```
+
+The Google screens are re-created, not filmed. Say so if someone asks whether it is a live recording.
+
 ## Notes for the team
 
 - Branch `openpath-demo` has the demo. Open a pull request into `main` when you are happy with it.

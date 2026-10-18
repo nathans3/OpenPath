@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenPath demo scene</title>
+<!-- A re-creation of Google's sign-up pages for the OpenPath demo video.
+     OpenPath's circle, answer box and pointer on top are the app's real code. -->
+<link rel="stylesheet" href="../../app/css/overlay.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Open+Sans:wght@400;500;600&display=swap">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #1b2735; }
+  body { font-family: Roboto, Arial, sans-serif; color: #1f1f1f; }
+  #desktop { position: absolute; inset: 0; background: radial-gradient(1200px 700px at 70% 20%, #3b6c8f 0%, #22394f 55%, #16222f 100%); }
+  /* macOS menu bar */
+  #menubar { position: absolute; left: 0; right: 0; top: 0; height: 30px; background: rgba(240,240,245,.82); backdrop-filter: blur(20px);
+    display: flex; align-items: center; gap: 22px; padding: 0 18px; font: 500 14px -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; color: #1d1d1f; }
+  #menubar .apple { font-size: 17px; margin-right: 2px; }
+  #menubar b { font-weight: 700; }
+  #menubar .right { margin-left: auto; display: flex; gap: 18px; }
+  /* Browser window */
+  #browser { position: absolute; left: 14px; top: 42px; width: 1440px; height: 1024px; background: #fff; display: flex; flex-direction: column; overflow: hidden; border-radius: 11px; box-shadow: 0 22px 70px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.25); }
+  .tabs { height: 42px; background: #dee3ea; display: flex; align-items: flex-end; padding-left: 86px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 15px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .tab { height: 34px; width: 250px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; gap: 9px; padding: 0 14px;
+    font: 13px -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; color: #1f1f1f; }
+  .tab span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab .x { color: #5f6368; font-size: 14px; flex: none; }
+  .newtab { margin: 0 0 8px 12px; color: #5f6368; font-size: 20px; }
+  .toolbar { height: 46px; display: flex; align-items: center; gap: 16px; padding: 0 14px; border-bottom: 1px solid #e3e6ea;
+    font: 15px -apple-system, "SF Pro Text", sans-serif; color: #5f6368; }
+  .omnibox { flex: 1; height: 34px; border-radius: 17px; background: #eef1f5; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 15px; color: #1f1f1f; }
+  .omnibox .lock { color: #5f6368; font-size: 13px; }
+  #viewport { position: relative; flex: 1; overflow: hidden; background: #f0f4f9; }
+  .page { position: absolute; inset: 0; display: none; }
+  .page.on { display: block; animation: pagein .25s ease; }
+  @keyframes pagein { from { opacity: .3; } to { opacity: 1; } }
+
+  /* google.com */
+  .home { background: #fff; }
+  .home .top { position: absolute; right: 26px; top: 16px; display: flex; align-items: center; gap: 22px; font: 14px Arial, sans-serif; color: #1f1f1f; }
+  .home .apps { font-size: 20px; color: #5f6368; letter-spacing: -2px; }
+  .signin-btn { background: #0b57d0; color: #fff; border-radius: 20px; padding: 10px 24px; font: 500 14px "Open Sans", Arial, sans-serif; }
+  .home .top .left-links { position: fixed; }
+  .home .wordmark { position: absolute; left: 50%; top: 250px; transform: translateX(-50%); font: 400 92px "Open Sans", Arial, sans-serif; letter-spacing: -5px; }
+  .wordmark .b { color: #4285f4; } .wordmark .r { color: #ea4335; } .wordmark .y { color: #fbbc05; } .wordmark .g { color: #34a853; }
+  .home .search { position: absolute; left: 50%; top: 410px; transform: translateX(-50%); width: 690px; height: 50px; border: 1px solid #dfe1e5; border-radius: 25px;
+    box-shadow: 0 1px 6px rgba(32,33,36,.18); display: flex; align-items: center; padding: 0 20px; gap: 14px; color: #9aa0a6; font-size: 18px; }
+  .home .btns { position: absolute; left: 50%; top: 500px; transform: translateX(-50%); display: flex; gap: 12px; }
+  .home .btns span { background: #f8f9fa; border: 1px solid #f8f9fa; border-radius: 4px; padding: 10px 16px; font: 14px Arial; color: #3c4043; }
+  .home .foot { position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: #f2f2f2; display: flex; align-items: center; gap: 28px; padding: 0 28px; font: 14px Arial; color: #70757a; }
+
+  /* Google account pages */
+  .card { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); width: 1040px; min-height: 420px; background: #fff; border-radius: 28px; padding: 36px 36px 32px; box-sizing: border-box;
+    display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px; }
+  .card .bar { position: absolute; left: 28px; right: 28px; top: 0; height: 4px; overflow: hidden; border-radius: 2px; }
+  .card .bar i { position: absolute; top: 0; left: -40%; width: 40%; height: 4px; background: #0b57d0; animation: load 1.1s ease-in-out infinite; }
+  .card.loading .bar { display: block; } .card .bar { display: none; }
+  @keyframes load { to { left: 100%; } }
+  .glogo { width: 48px; height: 48px; display: block; margin-bottom: 18px; }
+  .card h1 { font: 400 36px/44px "Open Sans", Arial, sans-serif; margin: 0 0 16px; letter-spacing: -.5px; }
+  .card .sub { font: 16px/24px Roboto, Arial, sans-serif; color: #1f1f1f; }
+  .card .right { padding-top: 66px; display: flex; flex-direction: column; gap: 22px; }
+  .card .actions { grid-column: 2; display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 30px; }
+  .gbtn { background: #0b57d0; color: #fff; border-radius: 20px; height: 40px; padding: 0 24px; display: inline-flex; align-items: center; font: 500 14px "Open Sans", Arial, sans-serif; }
+  .tbtn { color: #0b57d0; border-radius: 20px; height: 40px; padding: 0 14px; display: inline-flex; align-items: center; font: 500 14px "Open Sans", Arial, sans-serif; position: relative; }
+  .link { color: #0b57d0; font: 500 14px "Open Sans", Arial, sans-serif; }
+  .para { font: 14px/20px Roboto, Arial, sans-serif; color: #444746; }
+  /* outlined field */
+  .field { position: relative; height: 56px; border: 1px solid #747775; border-radius: 4px; box-sizing: border-box; display: flex; align-items: center; }
+  .field input { border: 0; outline: 0; background: transparent; font: 16px Roboto, Arial, sans-serif; color: #1f1f1f; padding: 0 15px; width: 100%; height: 100%; }
+  .field label { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); padding: 0 4px; background: #fff; color: #444746; font: 16px Roboto, Arial, sans-serif; transition: all .15s ease; pointer-events: none; }
+  .field.focus { border: 2px solid #0b57d0; }
+  .field.focus label, .field.filled label { top: 0; font-size: 12px; }
+  .field.focus label { color: #0b57d0; }
+  .field .suffix { padding-right: 15px; font: 16px Roboto; color: #444746; }
+  .field.select::after { content: ""; position: absolute; right: 16px; top: 50%; margin-top: -3px; border: 5px solid transparent; border-top: 6px solid #444746; }
+  .field .value { padding: 0 15px; font: 16px Roboto; }
+  .row3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 14px; }
+  .menu { position: absolute; background: #fff; border-radius: 4px; box-shadow: 0 2px 6px 2px rgba(60,64,67,.15), 0 1px 2px rgba(60,64,67,.3); padding: 8px 0; z-index: 5; display: none; min-width: 100%; }
+  .menu.on { display: block; animation: menuin .15s ease; }
+  @keyframes menuin { from { opacity: 0; transform: translateY(-6px); } }
+  .menu div { padding: 12px 16px; font: 16px Roboto; color: #1f1f1f; white-space: nowrap; }
+  .menu div.hover { background: #e8eaed; }
+  .radio { display: flex; align-items: center; gap: 16px; font: 16px Roboto; padding: 6px 0; }
+  .radio i { width: 18px; height: 18px; border: 2px solid #444746; border-radius: 50%; box-sizing: border-box; display: grid; place-items: center; }
+  .radio.on i { border-color: #0b57d0; } .radio.on i::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #0b57d0; }
+  .check { display: flex; align-items: center; gap: 14px; font: 14px Roboto; }
+  .check i { width: 18px; height: 18px; border: 2px solid #444746; border-radius: 2px; box-sizing: border-box; }
+  .hint { font: 12px Roboto; color: #444746; margin-top: -14px; padding-left: 16px; }
+  .terms { height: 300px; overflow: hidden; position: relative; }
+  .terms .inner { font: 14px/22px Roboto; color: #1f1f1f; transition: transform 1.6s ease; }
+  .terms .inner h3 { font: 500 16px Roboto; margin: 14px 0 6px; }
+  .acct { display: flex; align-items: center; gap: 16px; border: 1px solid #c4c7c5; border-radius: 16px; padding: 14px 18px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: #7b5ea7; color: #fff; display: grid; place-items: center; font: 500 18px Roboto; }
+  .acct b { display: block; font: 500 15px Roboto; } .acct span { font: 14px Roboto; color: #444746; }
+  .done-page { background: #fff; }
+  .done-page .hello { position: absolute; left: 50%; top: 160px; transform: translateX(-50%); text-align: center; }
+  .done-page .hello .avatar { width: 96px; height: 96px; font-size: 44px; margin: 0 auto 20px; }
+  .done-page h2 { font: 400 32px "Open Sans"; margin: 0 0 10px; }
+  .done-page p { font: 16px Roboto; color: #444746; margin: 0; }
+
+  /* the person's mouse and the Ctrl+O press */
+  #mouse { position: absolute; left: 0; top: 0; width: 26px; height: 36px; z-index: 2147483600; pointer-events: none; transition: transform .7s cubic-bezier(.4,.1,.2,1); }
+  #mouse svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); transition: transform .08s ease; transform-origin: 3px 3px; }
+  #mouse.down svg { transform: scale(.85); }
+  #ripple { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 3px solid rgba(11,87,208,.55); z-index: 2147483599; pointer-events: none; opacity: 0; }
+  #ripple.go { animation: ripple .45s ease-out; }
+  @keyframes ripple { from { opacity: 1; transform: scale(.3); } to { opacity: 0; transform: scale(1.4); } }
+  #keycap { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%) translateY(20px); background: rgba(20,24,30,.86); color: #fff; border-radius: 16px; padding: 14px 24px;
+    font: 600 26px -apple-system, "SF Pro Display", sans-serif; display: flex; gap: 12px; align-items: center; opacity: 0; transition: all .25s ease; z-index: 2147483600; }
+  #keycap kbd { background: #fff; color: #111; border-radius: 8px; padding: 4px 14px; font: 600 24px -apple-system, sans-serif; box-shadow: 0 3px 0 #9aa3ad; }
+  #keycap.on { opacity: 1; transform: translateX(-50%); }
+  /* Fast cuts: let the pointer's ring settle quickly so no frame catches it mid-resize. */
+  #op-root .op-ring { transition-duration: .12s !important; }
+  #caption { position: absolute; left: 24px; bottom: 18px; color: rgba(255,255,255,.75); font: 13px -apple-system, sans-serif; z-index: 2147483600; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+</style>
+</head>
+<body>
+<div id="desktop">
+  <div id="menubar"><span class="apple"></span><b>Google Chrome</b><span>File</span><span>Edit</span><span>View</span><span>History</span><span>Bookmarks</span><span>Profiles</span><span>Tab</span><span>Window</span><span>Help</span>
+    <span class="right"><span>Wed Oct 21</span><span>10:24 AM</span></span></div>
+  <div id="browser">
+    <div class="tabs"><div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+      <div class="tab"><svg width="16" height="16" viewBox="0 0 48 48"><use href="#g"/></svg><span id="tabtitle">Google</span><span class="x">✕</span></div><span class="newtab">+</span></div>
+    <div class="toolbar"><span>←</span><span>→</span><span>⟳</span><div class="omnibox"><span class="lock">⚲</span><span id="url">google.com</span></div><span>☆</span><span>⋮</span></div>
+    <div id="viewport">
+
+      <section class="page home on" data-page="home">
+        <div class="top"><span>Gmail</span><span>Images</span><span class="apps">⠿⠿</span><span class="signin-btn" id="home-signin">Sign in</span></div>
+        <div class="wordmark"><span class="b">G</span><span class="r">o</span><span class="y">o</span><span class="b">g</span><span class="g">l</span><span class="r">e</span></div>
+        <div class="search"><span>🔍︎</span><span style="flex:1"></span><span>🎙︎</span></div>
+        <div class="btns"><span>Google Search</span><span>I'm Feeling Lucky</span></div>
+        <div class="foot"><span>Advertising</span><span>Business</span><span>How Search works</span><span style="margin-left:auto">Privacy</span><span>Terms</span><span>Settings</span></div>
+      </section>
+
+      <section class="page" data-page="signin"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Sign in</h1><div class="sub">with your Google Account. This account will be available to other Google apps in the browser.</div></div>
+        <div class="right"><div class="field"><input><label>Email or phone</label></div><span class="link">Forgot email?</span>
+          <div class="para">Not your computer? Use Guest mode to sign in privately. <span class="link">Learn more about using Guest mode</span></div></div>
+        <div class="actions"><span class="tbtn" id="create-account">Create account
+          <div class="menu" id="acct-menu" style="top:44px;left:0"><div>For my personal use</div><div>For my child</div><div>For work or my business</div></div></span><span class="gbtn">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="name"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Create a Google Account</h1><div class="sub">Enter your name</div></div>
+        <div class="right"><div class="field" id="f-first"><input><label>First name</label></div><div class="field" id="f-last"><input><label>Last name (optional)</label></div></div>
+        <div class="actions"><span class="gbtn" id="name-next">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="birthday"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Basic information</h1><div class="sub">Enter your birthday and gender</div></div>
+        <div class="right">
+          <div class="row3">
+            <div class="field select" id="f-month"><span class="value"></span><label>Month</label>
+              <div class="menu" id="month-menu" style="top:56px;left:-1px;max-height:none"><div>January</div><div>February</div><div>March</div><div>April</div><div>May</div><div>June</div><div>July</div></div></div>
+            <div class="field" id="f-day"><input><label>Day</label></div>
+            <div class="field" id="f-year"><input><label>Year</label></div>
+          </div>
+          <div class="field select" id="f-gender"><span class="value"></span><label>Gender</label>
+            <div class="menu" id="gender-menu" style="top:56px;left:-1px"><div>Female</div><div>Male</div><div>Rather not say</div><div>Custom</div></div></div>
+          <span class="link">Why we ask for birthday and gender</span>
+        </div>
+        <div class="actions"><span class="gbtn" id="bday-next">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="username"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Choose your Gmail address</h1><div class="sub">Pick a Gmail address or create your own</div></div>
+        <div class="right" style="gap:10px">
+          <div class="radio"><i></i>margaretlee1948@gmail.com</div>
+          <div class="radio"><i></i>leemargaret48@gmail.com</div>
+          <div class="radio" id="r-own"><i></i>Create your own Gmail address</div>
+          <div class="field" id="f-user" style="display:none;margin-top:10px"><input><label>Username</label><span class="suffix">@gmail.com</span></div>
+          <div class="hint" id="user-hint" style="display:none;margin-top:4px">You can use letters, numbers &amp; periods</div>
+        </div>
+        <div class="actions"><span class="gbtn" id="user-next">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="password"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Create a strong password</h1><div class="sub">Create a strong password with a mix of letters, numbers and symbols</div></div>
+        <div class="right"><div class="field" id="f-pass"><input type="password"><label>Password</label></div><div class="field" id="f-confirm"><input type="password"><label>Confirm</label></div>
+          <div class="check"><i></i>Show password</div></div>
+        <div class="actions"><span class="gbtn" id="pass-next">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="review"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Review your account info</h1><div class="sub">You can use this email address to sign in later</div></div>
+        <div class="right"><div class="acct"><div class="avatar">M</div><div><b>Margaret Lee</b><span>margaret.lee.1948@gmail.com</span></div></div></div>
+        <div class="actions"><span class="gbtn" id="review-next">Next</span></div>
+      </div></section>
+
+      <section class="page" data-page="terms"><div class="card">
+        <div class="bar"><i></i></div>
+        <div><svg class="glogo" viewBox="0 0 48 48"><use href="#g"/></svg><h1>Privacy and Terms</h1><div class="sub">To create a Google Account, you'll need to agree to the Terms of Service below.</div></div>
+        <div class="right" style="padding-top:20px"><div class="terms"><div class="inner" id="terms-inner">
+          <p>In addition, when you create an account, we process your information as described in our Privacy Policy, including these key points:</p>
+          <h3>Data we process when you use Google</h3><p>When you set up a Google Account, we store information you give us like your name, email address, and telephone number.</p>
+          <p>When you use Google services to do things like write a message in Gmail or comment on a YouTube video, we store the information you create.</p>
+          <h3>Why we process it</h3><p>We process this data for the purposes described in our policy, including to help our services deliver more useful, customized content.</p>
+          <h3>Combining data</h3><p>We also combine this data among our services and across your devices for these purposes.</p>
+          <h3>You're in control</h3><p>Depending on your account settings, some of this data may be associated with your Google Account. You can control how we collect and use this data.</p>
+        </div></div></div>
+        <div class="actions"><span class="tbtn">More options</span><span class="gbtn" id="agree">I agree</span></div>
+      </div></section>
+
+      <section class="page done-page" data-page="done">
+        <div class="hello"><div class="avatar">M</div><h2>Welcome, Margaret Lee</h2><p>Manage your info, privacy, and security to make Google work better for you.</p></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div id="ripple"></div>
+<div id="mouse"><svg width="26" height="36" viewBox="0 0 26 36"><path d="M2 2 L2 28 L8.5 22 L13 33 L17.5 31 L13 20.5 L22 20.5 Z" fill="#000" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></div>
+<div id="keycap"><kbd>control</kbd>+<kbd>O</kbd><span style="font-size:20px;font-weight:500;opacity:.85">to talk to OpenPath</span></div>
+<div id="caption"></div>
+<div id="op-root"></div>
+<svg width="0" height="0" style="position:absolute"><defs><symbol id="g" viewBox="0 0 48 48">
+  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+</symbol></defs></svg>
+<script type="module" src="./scene.js"></script>
+</body>
+</html>
